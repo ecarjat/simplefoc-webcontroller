@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 import { SimpleFocSerialPort } from "../simpleFoc/serial";
+import { SerialConnection } from "./serialTypes";
 import { useLastValue } from "./useLastValue";
 import { useRerender, useThrotthledRerender } from "./utils";
 
-export const serialPortContext = createContext<SimpleFocSerialPort | null>(
-  null
-);
+export const serialPortContext = createContext<SerialConnection | null>(null);
 
 export const useSerialPort = () => {
   return useContext(serialPortContext);
@@ -43,7 +42,7 @@ export const useSerialPortOpenStatus = () => {
     return () => {
       serialPort?.removeListener("stateChange", rerender);
     };
-  }, []);
+  }, [serialPort, rerender]);
 
   return !!serialPort?.port;
 };

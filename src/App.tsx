@@ -1,15 +1,15 @@
 import { useState } from "react";
 import "./App.css";
-import { SimpleFocSerialPort } from "./simpleFoc/serial";
 import Header from "./components/Header";
 import { Box, Stack, Typography } from "@mui/material";
 import { SerialManager } from "./components/SerialManager";
 import { Container } from "@mui/system";
 import { Motors } from "./components/Motors";
 import { serialPortContext } from "./lib/serialContext";
+import { SerialConnection } from "./lib/serialTypes";
 
 function App() {
-  const [serial, setSerial] = useState<SimpleFocSerialPort | null>(null);
+  const [serial, setSerial] = useState<SerialConnection | null>(null);
 
   const supportSerial = typeof navigator.serial === "object";
 

@@ -15,6 +15,8 @@ import { Box } from "@mui/system";
 import { useState } from "react";
 import { useAvailablePorts } from "../lib/useAvailablePorts";
 import { SimpleFocSerialPort } from "../simpleFoc/serial";
+import { BinarySerialConnection } from "../lib/BinarySerialConnection";
+import { SerialConnection, SerialMode } from "../lib/serialTypes";
 import { SerialCommandPrompt } from "./SerialCommandPrompt";
 import { SerialOutputViewer } from "./SerialOutputViewer";
 
@@ -33,6 +35,7 @@ const BAUD_RATES =
   115200,
   230400,
   250000,
+  460800,
   921600
 ];
 
@@ -41,19 +44,23 @@ export const SerialManager = ({
   serial,
   ...other
 }: {
-  serial: SimpleFocSerialPort | null;
-  onSetSerial: (serial: SimpleFocSerialPort | null) => any;
+  serial: SerialConnection | null;
+  onSetSerial: (serial: SerialConnection | null) => any;
 }) => {
   const [baudRate, setBaudRate] = useState(BAUD_RATES[1]);
+  const [mode, setMode] = useState<SerialMode>("ascii");
   const [loading, setLoading] = useState(false);
   const ports = useAvailablePorts();
 
   const handleConnect = async (port?: SerialPort) => {
-    const serial = new SimpleFocSerialPort(baudRate);
+    const serialImpl =
+      mode === "ascii"
+        ? new SimpleFocSerialPort(baudRate)
+        : new BinarySerialConnection(baudRate);
     setLoading(true);
     try {
-      await serial.open(port);
-      onSetSerial(serial);
+      await serialImpl.open(port);
+      onSetSerial(serialImpl);
     } finally {
       setLoading(false);
     }
@@ -93,6 +100,15 @@ export const SerialManager = ({
                   {option}
                 </MenuItem>
               ))}
+            </TextField>
+            <TextField
+              select
+              label="Protocol"
+              value={mode}
+              onChange={(e) => setMode(e.target.value as SerialMode)}
+            >
+              <MenuItem value="ascii">ASCII (Commander)</MenuItem>
+              <MenuItem value="binary">BinaryIO (PacketCommander)</MenuItem>
             </TextField>
             <ButtonGroup variant="contained">
               <Button

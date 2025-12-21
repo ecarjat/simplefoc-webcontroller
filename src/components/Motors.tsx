@@ -14,7 +14,7 @@ import {
   AccordionSummary,
 } from "./ParametersAccordion";
 import { red } from "@mui/material/colors";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSerialIntervalSender } from "../lib/useSerialIntervalSender";
 import { useSerialLineEvent } from "../lib/useSerialLineEvent";
 import { FocBoolean } from "./Parameters/FocBoolean";
@@ -22,15 +22,23 @@ import { FocScalar } from "./Parameters/FocScalar";
 import { MotorMonitorGraph } from "./MotorMonitorGraph";
 import { useSerialPortOpenStatus } from "../lib/serialContext";
 import { MotorControlTypeSwitch } from "./Parameters/MotorControlTypeSwitch";
+import { useSerialPort } from "../lib/serialContext";
+import { REGISTER_BY_NAME } from "../lib/registerMap";
 
 const MOTOR_OUTPUT_REGEX = /^\?(\w):(.*)\r?$/;
 
 export const Motors = () => {
   const [motors, setMotors] = useState<{ [key: string]: string }>({});
   const portOpen = useSerialPortOpenStatus();
+  const serial = useSerialPort();
+
+  useEffect(() => {
+    setMotors({});
+  }, [serial]);
 
   useSerialIntervalSender("?", 10000);
   useSerialLineEvent((line) => {
+    if (serial?.mode === "binary") return;
     const match = line.content.match(MOTOR_OUTPUT_REGEX);
     if (match) {
       setMotors((m) => ({
@@ -39,6 +47,32 @@ export const Motors = () => {
       }));
     }
   });
+
+  useEffect(() => {
+    if (!serial || serial.mode !== "binary") return;
+    let cancelled = false;
+    const load = async () => {
+      const res = await serial.readRegister?.(REGISTER_BY_NAME.NUM_MOTORS.id);
+      const countRaw = res?.value as number | number[] | undefined;
+      const count =
+        typeof countRaw === "number"
+          ? countRaw
+          : Array.isArray(countRaw)
+          ? countRaw[0]
+          : 0;
+      const next: { [key: string]: string } = {};
+      for (let i = 0; i < (count || 0); i++) {
+        next[i.toString()] = i.toString();
+      }
+      if (!cancelled) {
+        setMotors(next);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [serial]);
 
   if (!Object.keys(motors).length) {
     if (!portOpen) {

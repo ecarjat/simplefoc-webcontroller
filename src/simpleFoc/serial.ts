@@ -10,7 +10,8 @@ export type SerialLine = {
   type: "received" | "sent";
 };
 
-export class SimpleFocSerialPort extends EventEmitter<"line" | "stateChange"> {
+export class SimpleFocSerialPort extends EventEmitter<any> {
+  mode: "ascii" = "ascii";
   port: SerialPort | undefined;
   writer: WritableStreamDefaultWriter<string> | undefined;
 
@@ -41,7 +42,9 @@ export class SimpleFocSerialPort extends EventEmitter<"line" | "stateChange"> {
 
     if (port.writable) {
       const textEncoder = new TextEncoderStream();
-      const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+      // Web Serial typing exposes WritableStream<BufferSource>; TextEncoderStream expects Uint8Array, so cast to align types.
+      const serialWritable = port.writable as unknown as WritableStream<Uint8Array>;
+      const writableStreamClosed = textEncoder.readable.pipeTo(serialWritable);
       this.writer = textEncoder.writable.getWriter();
 
       this._closeWriter = async () => {
@@ -58,7 +61,11 @@ export class SimpleFocSerialPort extends EventEmitter<"line" | "stateChange"> {
     assertExist(this.port);
     while (this.port?.readable) {
       // will restart a loop if a non-fatal error was triggered
-      const textDecoder = new TextDecoderStream();
+      const textDecoder =
+        (new TextDecoderStream() as unknown as TransformStream<
+          Uint8Array,
+          string
+        >);
       const readableStreamClosed = this.port.readable.pipeTo(
         textDecoder.writable
       );

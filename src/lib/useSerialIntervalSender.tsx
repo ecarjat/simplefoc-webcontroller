@@ -10,6 +10,9 @@ export const useSerialIntervalSender = (command: string, interval: number) => {
     if (!status) {
       return;
     }
+    if ((serial as any)?.mode === "binary") {
+      return;
+    }
 
     serial?.send(command);
     const intervalRef = setInterval(() => {

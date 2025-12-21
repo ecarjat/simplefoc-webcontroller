@@ -1,12 +1,17 @@
 import { Axis } from "plotly.js";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Plot, { Figure } from "react-plotly.js";
 import { useSerialLineEvent } from "../lib/useSerialLineEvent";
+import { useSerialPort } from "../lib/serialContext";
+import { REGISTER_BY_NAME } from "../lib/registerMap";
+import { TelemetryData } from "../lib/serialTypes";
+import { TextField } from "@mui/material";
 
 const MAX_POINTS = 100;
 const X_SCALE = new Array(MAX_POINTS).fill(0).map((x, i) => i);
 
 const COLORS = ["red", "green", "blue", "orange", "pink"];
+const BINARY_TRACE_NAMES = ["TARGET", "POSITION", "SENSOR_ANGLE", "VELOCITY"];
 
 export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
   const metrics = useRef([] as { name: string; data: number[] }[]);
@@ -15,8 +20,11 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
     xaxis: undefined as undefined | number[],
     yaxis: [] as (undefined | number[])[],
   });
+  const serial = useSerialPort();
+  const [frequencyHz, setFrequencyHz] = useState(50);
 
   useSerialLineEvent((line) => {
+    if ((serial as any)?.mode === "binary") return;
     if (line.content.startsWith(`${motorKey}M`)) {
       const points = line.content.slice(2).split("\t").map(Number);
       points.forEach((point, i) => {
@@ -37,6 +45,56 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
       setRevision((r) => r + 1);
     }
   });
+
+  useEffect(() => {
+    if (!serial || serial.mode !== "binary") return;
+    const registers = [
+      { motor: Number(motorKey), register: REGISTER_BY_NAME.TARGET.id },
+      { motor: Number(motorKey), register: REGISTER_BY_NAME.POSITION.id },
+      { motor: Number(motorKey), register: REGISTER_BY_NAME.SENSOR_ANGLE.id },
+      { motor: Number(motorKey), register: REGISTER_BY_NAME.VELOCITY.id },
+    ];
+    serial.configureTelemetry?.(registers, frequencyHz);
+  }, [serial, motorKey, frequencyHz]);
+
+  useEffect(() => {
+    if (!serial || serial.mode !== "binary") return;
+    const handler = (data: TelemetryData) => {
+      const values = data.values.map((val, idx) => {
+        if (data.registers[idx].register === REGISTER_BY_NAME.POSITION.id) {
+          const arr = Array.isArray(val) ? val : [val];
+          if (arr.length >= 2) {
+            return (arr[0] as number) + (arr[1] as number);
+          }
+        }
+        return Array.isArray(val) ? val[0] : val;
+      });
+      values.forEach((point, i) => {
+        if (!metrics.current[i]) {
+          const defaultName =
+            serial?.mode === "binary"
+              ? BINARY_TRACE_NAMES[i] || i.toString()
+              : `Trace ${i}`;
+          metrics.current[i] = {
+            name: defaultName,
+            data: [],
+          };
+        }
+        metrics.current[i].data.push(typeof point === "number" ? point : 0);
+        if (metrics.current[i].data.length > MAX_POINTS) {
+          metrics.current[i].data.splice(
+            0,
+            metrics.current[i].data.length - MAX_POINTS
+          );
+        }
+      });
+      setRevision((r) => r + 1);
+    };
+    serial.on("telemetry", handler);
+    return () => {
+      serial.off("telemetry", handler);
+    };
+  }, [serial]);
 
   const handleGraphUpdate = (update: Readonly<Figure>) => {
     let newZoom: typeof axisZooms = {
@@ -85,12 +143,22 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
       side: i % 2 ? "left" : "right",
       // anchor: "free",
       // overlaying: "y",
-      title: `Trace ${i}`,
-    };
-  });
+          title: metrics.current[i]?.name || `Trace ${i}`,
+        };
+      });
 
   return (
     <div>
+      {serial?.mode === "binary" && (
+        <TextField
+          label="Telemetry rate (Hz)"
+          type="number"
+          size="small"
+          value={frequencyHz}
+          onChange={(e) => setFrequencyHz(Number(e.target.value))}
+          sx={{ marginBottom: 1 }}
+        />
+      )}
       <Plot
         revision={revision}
         data={metrics.current.map((metric, i) => ({

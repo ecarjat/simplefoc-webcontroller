@@ -6,11 +6,14 @@ import {
 } from "../ParametersAccordion";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { throttle } from "lodash-es";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSerialPortRef } from "../../lib/serialContext";
 import { useSerialIntervalSender } from "../../lib/useSerialIntervalSender";
 import { useSerialLineEvent } from "../../lib/useSerialLineEvent";
 import { useParameterSettings } from "../../lib/useParameterSettings";
+import { COMMAND_TO_REGISTER_NAME } from "../../lib/commandRegisterMap";
+import { REGISTER_BY_NAME } from "../../lib/registerMap";
+import { useSerialPort } from "../../lib/serialContext";
 
 export const FocScalar = (props: {
   motorKey: string;
@@ -23,12 +26,16 @@ export const FocScalar = (props: {
   const fullCommandString = `${props.motorKey}${props.command}`;
   const { expanded, setExpanded, min, setMin, max, setMax } =
     useParameterSettings(fullCommandString, props.defaultMin, props.defaultMax);
+  const registerName = COMMAND_TO_REGISTER_NAME[props.command];
+  const registerId = registerName ? REGISTER_BY_NAME[registerName].id : null;
+  const serial = useSerialPort();
 
   const [targetValue, setTargetValue] = useState<number | null>(null); // value sent to controller
   const [value, setValue] = useState<number | null>(null); // value acknowledged by controller, for now not used
   const serialRef = useSerialPortRef();
 
   useSerialLineEvent((line) => {
+    if ((serial as any)?.mode === "binary") return;
     if (line.content.startsWith(fullCommandString)) {
       const receivedValue = Number(
         line.content.slice(fullCommandString.length)
@@ -43,12 +50,52 @@ export const FocScalar = (props: {
   });
   useSerialIntervalSender(fullCommandString, 3000);
 
+  useEffect(() => {
+    if (!serial || serial.mode !== "binary" || registerId === null) return;
+    const motorIndex = Number(props.motorKey);
+    const fetchVal = async () => {
+      await serial.setMotorAddress?.(motorIndex);
+      const res = await serial.readRegister?.(registerId);
+      if (res) {
+        const rawVal = Array.isArray(res.value) ? res.value[0] : res.value;
+        if (typeof rawVal === "number") {
+          setValue(rawVal);
+          setTargetValue((prev) => (prev === null ? rawVal : prev));
+        }
+      }
+    };
+    fetchVal();
+    const handler = (res: any) => {
+      if (res.registerId === registerId) {
+        const rawVal = Array.isArray(res.value) ? res.value[0] : res.value;
+        if (typeof rawVal === "number") {
+          setValue(rawVal);
+          setTargetValue((prev) => (prev === null ? rawVal : prev));
+        }
+      }
+    };
+    serial.on("response", handler);
+    return () => {
+      serial.off("response", handler);
+    };
+  }, [serial, registerId, props.motorKey]);
+
   const changeValue = useMemo(
     () =>
       throttle((value: number) => {
-        serialRef.current?.send(`${fullCommandString}${value}`);
+        if ((serialRef.current as any)?.mode === "binary" && registerId !== null) {
+          serialRef.current
+            ?.setMotorAddress?.(Number(props.motorKey))
+            .then(() =>
+              serialRef.current?.writeRegister?.(registerId, value, {
+                expectResponse: true,
+              })
+            );
+        } else {
+          serialRef.current?.send(`${fullCommandString}${value}`);
+        }
       }, 200),
-    []
+    [registerId, props.motorKey, serialRef]
   );
 
   const handleSliderChange = (e: any) => {
