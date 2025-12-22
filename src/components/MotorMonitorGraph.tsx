@@ -1,188 +1,465 @@
-import { Axis } from "plotly.js";
-import { useEffect, useRef, useState } from "react";
-import Plot, { Figure } from "react-plotly.js";
+import {
+  Checkbox,
+  Stack,
+  TextField,
+  FormControlLabel,
+  Box,
+  Typography,
+} from "@mui/material";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Plotly from "plotly.js-dist-min";
 import { useSerialLineEvent } from "../lib/useSerialLineEvent";
 import { useSerialPort } from "../lib/serialContext";
-import { REGISTER_BY_NAME } from "../lib/registerMap";
+import {
+  REGISTER_BY_NAME,
+  REGISTER_DEFINITIONS,
+  RegisterDefinition,
+} from "../lib/registerMap";
 import { TelemetryData } from "../lib/serialTypes";
-import { TextField } from "@mui/material";
+import { defaultTelemetryConfig } from "../telemetry/config";
+import { PlotlyRenderer } from "../render/PlotlyRenderer";
+import { TelemetryPipeline } from "../telemetry/TelemetryPipeline";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+} from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { ResizableBox } from "react-resizable";
+import "react-resizable/css/styles.css";
 
-const MAX_POINTS = 100;
-const X_SCALE = new Array(MAX_POINTS).fill(0).map((x, i) => i);
+const COLORS = [
+  "#e53935",
+  "#1e88e5",
+  "#43a047",
+  "#fb8c00",
+  "#8e24aa",
+  "#00897b",
+  "#6d4c41",
+];
 
-const COLORS = ["red", "green", "blue", "orange", "pink"];
-const BINARY_TRACE_NAMES = ["TARGET", "POSITION", "SENSOR_ANGLE", "VELOCITY"];
+type TraceConfig = {
+  id: number;
+  name: string;
+  color: string;
+  enabled: boolean;
+  axis: "y" | "y2";
+};
 
 export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
-  const metrics = useRef([] as { name: string; data: number[] }[]);
-  const [revision, setRevision] = useState(0);
-  const [axisZooms, setAxisZooms] = useState({
-    xaxis: undefined as undefined | number[],
-    yaxis: [] as (undefined | number[])[],
-  });
   const serial = useSerialPort();
+  const plotContainerRef = useRef<HTMLDivElement | null>(null);
+  const plotDivRef = useRef<Plotly.PlotlyHTMLElement | null>(null);
+  const rendererRef = useRef<PlotlyRenderer | null>(null);
+  const pipelineRef = useRef<TelemetryPipeline | null>(null);
   const [frequencyHz, setFrequencyHz] = useState(50);
+  const [plotHeight, setPlotHeight] = useState(400);
+  const defaultTracesRef = useRef<TraceConfig[]>([
+    {
+      id: REGISTER_BY_NAME.TARGET.id,
+      name: "TARGET",
+      color: COLORS[0],
+      enabled: true,
+      axis: "y",
+    },
+    {
+      id: REGISTER_BY_NAME.POSITION.id,
+      name: "POSITION",
+      color: COLORS[1],
+      enabled: true,
+      axis: "y",
+    },
+    {
+      id: REGISTER_BY_NAME.SENSOR_ANGLE.id,
+      name: "SENSOR_ANGLE",
+      color: COLORS[2],
+      enabled: true,
+      axis: "y2",
+    },
+    {
+      id: REGISTER_BY_NAME.VELOCITY.id,
+      name: "VELOCITY",
+      color: COLORS[3],
+      enabled: true,
+      axis: "y2",
+    },
+  ]);
+  const [traces, setTraces] = useState<TraceConfig[]>(defaultTracesRef.current);
 
-  useSerialLineEvent((line) => {
-    if ((serial as any)?.mode === "binary") return;
-    if (line.content.startsWith(`${motorKey}M`)) {
-      const points = line.content.slice(2).split("\t").map(Number);
-      points.forEach((point, i) => {
-        if (!metrics.current[i]) {
-          metrics.current[i] = {
-            name: i.toString(),
-            data: [],
-          };
-        }
-        metrics.current[i].data.push(point);
-        if (metrics.current[i].data.length > MAX_POINTS) {
-          metrics.current[i].data.splice(
-            0,
-            metrics.current[i].data.length - MAX_POINTS
-          );
-        }
-      });
-      setRevision((r) => r + 1);
-    }
-  });
+  const { primaryOptions, velOptions, angOptions, otherOptions } = useMemo(() => {
+    const filterNumeric = (def: RegisterDefinition) => {
+      if (def.name.startsWith("TELEMETRY")) return false;
+      if (typeof def.encoding === "string") {
+        return def.encoding === "f32" || def.encoding === "u32";
+      }
+      return def.encoding.kind === "composite";
+    };
+    const defs = REGISTER_DEFINITIONS.filter(filterNumeric);
+    const makeOption = (def: RegisterDefinition, idx: number): TraceConfig => ({
+      id: def.id,
+      name: def.name,
+      color: COLORS[idx % COLORS.length],
+      enabled: defaultTracesRef.current.some((t) => t.id === def.id),
+      axis: "y",
+    });
 
+    const primaryIds = [
+      REGISTER_BY_NAME.TARGET.id,
+      REGISTER_BY_NAME.POSITION.id,
+      REGISTER_BY_NAME.SENSOR_ANGLE.id,
+      REGISTER_BY_NAME.VELOCITY.id,
+    ];
+    const velIds = [
+      REGISTER_BY_NAME.VEL_PID_P?.id,
+      REGISTER_BY_NAME.VEL_PID_I?.id,
+      REGISTER_BY_NAME.VEL_PID_D?.id,
+      REGISTER_BY_NAME.VEL_PID_RAMP?.id,
+      REGISTER_BY_NAME.VEL_PID_LIM?.id,
+      REGISTER_BY_NAME.VEL_LPF_T?.id,
+    ].filter(Boolean) as number[];
+    const angIds = [
+      REGISTER_BY_NAME.ANG_PID_P?.id,
+      REGISTER_BY_NAME.ANG_PID_I?.id,
+      REGISTER_BY_NAME.ANG_PID_D?.id,
+      REGISTER_BY_NAME.ANG_PID_RAMP?.id,
+      REGISTER_BY_NAME.ANG_PID_LIM?.id,
+      REGISTER_BY_NAME.ANG_LPF_T?.id,
+    ].filter(Boolean) as number[];
+
+    const primaryDefs = defs.filter((d) => primaryIds.includes(d.id));
+    const velDefs = defs.filter((d) => velIds.includes(d.id));
+    const angDefs = defs.filter((d) => angIds.includes(d.id));
+    const otherDefs = defs.filter(
+      (d) =>
+        !primaryIds.includes(d.id) && !velIds.includes(d.id) && !angIds.includes(d.id)
+    );
+
+    return {
+      primaryOptions: primaryDefs.map(makeOption),
+      velOptions: velDefs.map(makeOption),
+      angOptions: angDefs.map(makeOption),
+      otherOptions: otherDefs.map(makeOption),
+    };
+  }, []);
+
+  // Configure telemetry in binary mode whenever trace selection changes
   useEffect(() => {
     if (!serial || serial.mode !== "binary") return;
-    const registers = [
-      { motor: Number(motorKey), register: REGISTER_BY_NAME.TARGET.id },
-      { motor: Number(motorKey), register: REGISTER_BY_NAME.POSITION.id },
-      { motor: Number(motorKey), register: REGISTER_BY_NAME.SENSOR_ANGLE.id },
-      { motor: Number(motorKey), register: REGISTER_BY_NAME.VELOCITY.id },
-    ];
+    const enabled = traces.filter((t) => t.enabled);
+    const registers = enabled.map((t) => ({ motor: Number(motorKey), register: t.id }));
     serial.configureTelemetry?.(registers, frequencyHz);
-  }, [serial, motorKey, frequencyHz]);
+  }, [serial, traces, frequencyHz, motorKey]);
 
+  const perfConfig = useMemo(
+    () => ({
+      ...defaultTelemetryConfig,
+      renderHz: 120,
+      bufferSeconds: 0.25,
+      maxDrainPerTick: 50,
+      maxPointsOnChart: 1500,
+    }),
+    []
+  );
+
+  useEffect(() => {
+    if (plotDivRef.current) {
+      Plotly.Plots.resize(plotDivRef.current);
+    }
+  }, [plotHeight]);
+
+  const renderTraceRow = (
+    opt: TraceConfig,
+    idx: number,
+    tracesState: TraceConfig[],
+    setTracesState: (updater: (prev: TraceConfig[]) => TraceConfig[]) => void
+  ) => {
+    const current =
+      tracesState.find((t) => t.id === opt.id) ||
+      ({
+        ...opt,
+        color: opt.color || COLORS[idx % COLORS.length],
+        enabled: false,
+      } as TraceConfig);
+    return (
+      <Stack
+        key={opt.id}
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ width: "100%" }}
+      >
+        <Typography
+          variant="body2"
+          sx={{ width: 32, color: current.color, fontWeight: 600 }}
+        >
+          {current.name.slice(0, 3)}
+        </Typography>
+        <FormControlLabel
+          sx={{ flex: 1 }}
+          control={
+            <Checkbox
+              checked={current.enabled}
+              onChange={(e) =>
+                setTracesState((prev) => {
+                  const next = [...prev];
+                  const existingIndex = next.findIndex((t) => t.id === opt.id);
+                  if (existingIndex >= 0) {
+                    next[existingIndex] = {
+                      ...next[existingIndex],
+                      enabled: e.target.checked,
+                    };
+                  } else {
+                    next.push({
+                      ...opt,
+                      color: COLORS[idx % COLORS.length],
+                      enabled: e.target.checked,
+                    });
+                  }
+                  return next;
+                })
+              }
+            />
+          }
+          label={
+            <Typography variant="body2" sx={{ color: current.color }}>
+              {opt.name}
+            </Typography>
+          }
+        />
+        <TextField
+          type="color"
+          size="small"
+          value={current.color}
+          onChange={(e) =>
+            setTracesState((prev) =>
+              prev.map((t) =>
+                t.id === opt.id ? { ...t, color: e.target.value } : t
+              )
+            )
+          }
+          sx={{ width: 60, minWidth: 60 }}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={current.axis === "y"}
+              onChange={(e) => {
+                if (!e.target.checked) return;
+                setTracesState((prev) =>
+                  prev.map((t) =>
+                    t.id === opt.id ? { ...t, axis: "y" } : t
+                  )
+                );
+              }}
+            />
+          }
+          label="Y1"
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={current.axis === "y2"}
+              onChange={(e) => {
+                if (!e.target.checked) return;
+                setTracesState((prev) =>
+                  prev.map((t) =>
+                    t.id === opt.id ? { ...t, axis: "y2" } : t
+                  )
+                );
+              }}
+            />
+          }
+          label="Y2"
+        />
+      </Stack>
+    );
+  };
+
+  // Initialize Plotly and pipeline once
+  useEffect(() => {
+    if (!plotContainerRef.current) return;
+    if (!plotDivRef.current) {
+      const div = document.createElement("div");
+      div.style.width = "100%";
+      div.style.height = "100%";
+      plotContainerRef.current.appendChild(div);
+      plotDivRef.current = div as Plotly.PlotlyHTMLElement;
+    }
+    const enabledTraces = traces.filter((t) => t.enabled);
+    rendererRef.current = new PlotlyRenderer({
+      config: perfConfig,
+      traces: enabledTraces.map((t) => ({
+        name: t.name,
+        color: t.color,
+        axis: t.axis,
+      })),
+    });
+    pipelineRef.current = new TelemetryPipeline({
+      traces: enabledTraces.map((t) => ({
+        name: t.name,
+        color: t.color,
+        axis: t.axis,
+      })),
+      config: perfConfig,
+      renderer: rendererRef.current,
+    });
+    pipelineRef.current.attachDiv(plotDivRef.current);
+
+    return () => {
+      pipelineRef.current?.stop();
+      pipelineRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update traces in renderer/pipeline when selection changes
+  useEffect(() => {
+    if (!rendererRef.current || !pipelineRef.current) return;
+    const enabledTraces = traces.filter((t) => t.enabled);
+    rendererRef.current.setTraces(
+      enabledTraces.map((t) => ({
+        name: t.name,
+        color: t.color,
+        axis: t.axis,
+      }))
+    );
+    pipelineRef.current.setTraces(
+      enabledTraces.map((t) => ({
+        name: t.name,
+        color: t.color,
+        axis: t.axis,
+      }))
+    );
+  }, [traces]);
+
+  // Telemetry ingestion for binary mode
   useEffect(() => {
     if (!serial || serial.mode !== "binary") return;
     const handler = (data: TelemetryData) => {
-      const values = data.values.map((val, idx) => {
-        if (data.registers[idx].register === REGISTER_BY_NAME.POSITION.id) {
-          const arr = Array.isArray(val) ? val : [val];
-          if (arr.length >= 2) {
-            return (arr[0] as number) + (arr[1] as number);
-          }
+      if (!pipelineRef.current) return;
+      // map values in order of current enabled traces
+      const enabled = traces.filter((t) => t.enabled);
+      const mappedValues = enabled.map((t) => {
+        const idx = data.registers.findIndex((r) => r.register === t.id);
+        const val = data.values[idx];
+        if (Array.isArray(val)) {
+          return typeof val[0] === "number" ? val[0] : 0;
         }
-        return Array.isArray(val) ? val[0] : val;
+        return typeof val === "number" ? val : 0;
       });
-      values.forEach((point, i) => {
-        if (!metrics.current[i]) {
-          const defaultName =
-            serial?.mode === "binary"
-              ? BINARY_TRACE_NAMES[i] || i.toString()
-              : `Trace ${i}`;
-          metrics.current[i] = {
-            name: defaultName,
-            data: [],
-          };
-        }
-        metrics.current[i].data.push(typeof point === "number" ? point : 0);
-        if (metrics.current[i].data.length > MAX_POINTS) {
-          metrics.current[i].data.splice(
-            0,
-            metrics.current[i].data.length - MAX_POINTS
-          );
-        }
-      });
-      setRevision((r) => r + 1);
+      pipelineRef.current.ingest(mappedValues, performance.now());
     };
     serial.on("telemetry", handler);
     return () => {
       serial.off("telemetry", handler);
     };
-  }, [serial]);
+  }, [serial, traces]);
 
-  const handleGraphUpdate = (update: Readonly<Figure>) => {
-    let newZoom: typeof axisZooms = {
-      xaxis: update.layout.xaxis?.autorange
-        ? undefined
-        : update.layout.xaxis?.range,
-      yaxis: [],
-    };
-
-    let hasChanged = axisZooms.xaxis !== newZoom.xaxis;
-
-    metrics.current.map((m, i) => {
-      const yAxis = (update.layout as any)[
-        `yaxis${i === 0 ? "" : i + 1}`
-      ] as Partial<Axis>;
-
-      const zoom = yAxis?.autorange ? undefined : yAxis?.range;
-      newZoom.yaxis.push(zoom);
-      if (zoom !== axisZooms.yaxis[i]) {
-        hasChanged = true;
-      }
-    });
-
-    if (hasChanged) {
-      setAxisZooms(newZoom);
+  // ASCII fallback: parse M lines and push
+  useSerialLineEvent((line) => {
+    if (!pipelineRef.current || serial?.mode !== "ascii") return;
+    if (line.content.startsWith(`${motorKey}M`)) {
+      const parts = line.content.slice(2).split("\t").map(Number);
+      if (!parts.length) return;
+      const enabled = traces.filter((t) => t.enabled);
+      const mapped = enabled.map((_, idx) => parts[idx] ?? 0);
+      pipelineRef.current.ingest(mapped, performance.now());
     }
-  };
-
-  const axisData = {
-    xaxis: {
-      autoRange: axisZooms.xaxis,
-    },
-  } as any;
-  metrics.current.forEach((m, i) => {
-    const range = axisZooms.yaxis[i];
-    axisData[`yaxis${i === 0 ? "" : i + 1}`] = {
-      autoRange: !range,
-      range: range,
-      tickfront: {
-        color: COLORS[i],
-      },
-      titlefont: {
-        color: COLORS[i],
-      },
-      // position: i * 0.1,
-      side: i % 2 ? "left" : "right",
-      // anchor: "free",
-      // overlaying: "y",
-          title: metrics.current[i]?.name || `Trace ${i}`,
-        };
-      });
+  });
 
   return (
-    <div>
-      {serial?.mode === "binary" && (
+    <Stack direction="row" spacing={2} alignItems="flex-start">
+      <Box sx={{ minWidth: 320, flexShrink: 0 }}>
         <TextField
           label="Telemetry rate (Hz)"
           type="number"
           size="small"
           value={frequencyHz}
           onChange={(e) => setFrequencyHz(Number(e.target.value))}
-          sx={{ marginBottom: 1 }}
+          sx={{ marginBottom: 1, width: "100%" }}
         />
-      )}
-      <Plot
-        revision={revision}
-        data={metrics.current.map((metric, i) => ({
-          x: X_SCALE,
-          y: metric.data,
-          type: "scattergl",
-          mode: "lines",
-          yaxis: `y${i === 0 ? "" : i + 1}`,
-          line: {
-            color: COLORS[i],
-          },
-        }))}
-        layout={{
-          autosize: true,
-          height: 400,
-          datarevision: revision,
-          ...axisData,
-        }}
-        onUpdate={handleGraphUpdate}
-        useResizeHandler
-        style={{
-          width: "100%",
-        }}
-      />
-    </div>
+        <Stack spacing={1}>
+          {primaryOptions.map((opt, idx) =>
+            renderTraceRow(opt, idx, traces, setTraces)
+          )}
+        </Stack>
+        <Accordion defaultExpanded={false} disableGutters>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="body2" fontWeight={600}>
+              Velocity PID
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ p: 1 }}>
+            <Stack spacing={1}>
+              {velOptions.map((opt, idx) =>
+                renderTraceRow(opt, idx, traces, setTraces)
+              )}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+        <Accordion defaultExpanded={false} disableGutters>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="body2" fontWeight={600}>
+              Angle PID
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ p: 1 }}>
+            <Stack spacing={1}>
+              {angOptions.map((opt, idx) =>
+                renderTraceRow(opt, idx, traces, setTraces)
+              )}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+        {otherOptions.length > 0 && (
+          <Accordion defaultExpanded={false} disableGutters>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="body2" fontWeight={600}>
+                Other
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 1 }}>
+              <Stack spacing={1}>
+                {otherOptions.map((opt, idx) =>
+                  renderTraceRow(opt, idx, traces, setTraces)
+                )}
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+        )}
+      </Box>
+      <Box sx={{ flex: 1, minHeight: 400 }}>
+        <ResizableBox
+          width={Infinity}
+          height={plotHeight}
+          axis="y"
+          minConstraints={[100, 300]}
+          maxConstraints={[Infinity, 900]}
+          handle={(h, ref) => (
+            <span
+              ref={ref}
+              className={`react-resizable-handle react-resizable-handle-${h}`}
+              style={{ height: 8 }}
+            />
+          )}
+          onResize={(_, data) => {
+            setPlotHeight(data.size.height);
+            if (plotDivRef.current) {
+              Plotly.Plots.resize(plotDivRef.current);
+            }
+          }}
+        >
+          <div
+            ref={plotContainerRef}
+            style={{
+              width: "100%",
+              height: "100%",
+              minHeight: 300,
+              overflow: "hidden",
+            }}
+          />
+        </ResizableBox>
+      </Box>
+    </Stack>
   );
 };

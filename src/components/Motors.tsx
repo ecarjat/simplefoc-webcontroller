@@ -13,7 +13,7 @@ import {
   AccordionDetails,
   AccordionSummary,
 } from "./ParametersAccordion";
-import { red } from "@mui/material/colors";
+import { red, green } from "@mui/material/colors";
 import { useEffect, useState } from "react";
 import { useSerialIntervalSender } from "../lib/useSerialIntervalSender";
 import { useSerialLineEvent } from "../lib/useSerialLineEvent";
@@ -29,11 +29,13 @@ const MOTOR_OUTPUT_REGEX = /^\?(\w):(.*)\r?$/;
 
 export const Motors = () => {
   const [motors, setMotors] = useState<{ [key: string]: string }>({});
+  const [enabledState, setEnabledState] = useState<Record<string, boolean>>({});
   const portOpen = useSerialPortOpenStatus();
   const serial = useSerialPort();
 
   useEffect(() => {
     setMotors({});
+    setEnabledState({});
   }, [serial]);
 
   useSerialIntervalSender("?", 10000);
@@ -46,28 +48,45 @@ export const Motors = () => {
         [match[1]]: match[2],
       }));
     }
+    const enableMatch = line.content.match(/^(\w)E([01])/);
+    if (enableMatch) {
+      const motorKey = enableMatch[1];
+      const val = enableMatch[2] === "1";
+      setEnabledState((prev) => ({ ...prev, [motorKey]: val }));
+    }
   });
 
   useEffect(() => {
     if (!serial || serial.mode !== "binary") return;
     let cancelled = false;
     const load = async () => {
-      const res = await serial.readRegister?.(REGISTER_BY_NAME.NUM_MOTORS.id);
-      const countRaw = res?.value as number | number[] | undefined;
-      const count =
-        typeof countRaw === "number"
-          ? countRaw
+    const res = await serial.readRegister?.(REGISTER_BY_NAME.NUM_MOTORS.id);
+    const countRaw = res?.value as number | number[] | undefined;
+    const count =
+      typeof countRaw === "number"
+        ? countRaw
           : Array.isArray(countRaw)
           ? countRaw[0]
           : 0;
-      const next: { [key: string]: string } = {};
-      for (let i = 0; i < (count || 0); i++) {
-        next[i.toString()] = i.toString();
-      }
-      if (!cancelled) {
-        setMotors(next);
-      }
-    };
+    const next: { [key: string]: string } = {};
+    const nextEnabled: Record<string, boolean> = {};
+    for (let i = 0; i < (count || 0); i++) {
+      next[i.toString()] = i.toString();
+      await serial.setMotorAddress?.(i);
+      const enabledRes = await serial.readRegister?.(REGISTER_BY_NAME.ENABLE.id);
+      const enabledVal =
+        typeof enabledRes?.value === "number"
+          ? enabledRes.value
+          : Array.isArray(enabledRes?.value)
+          ? enabledRes?.value[0]
+          : 0;
+      nextEnabled[i.toString()] = !!enabledVal;
+    }
+    if (!cancelled) {
+      setMotors(next);
+      setEnabledState(nextEnabled);
+    }
+  };
     load();
     return () => {
       cancelled = true;
@@ -102,8 +121,21 @@ export const Motors = () => {
       {Object.entries(motors).map(([key, name]) => (
         <Card key={key}>
           <CardHeader
-            title={<Typography variant="h5">{name}</Typography>}
-            avatar={<Avatar sx={{ bgcolor: red[500] }}>{key}</Avatar>}
+            title={
+              <Typography variant="h5">
+                {name === key ? "" : `${name}`}
+              </Typography>
+            }
+            avatar={
+              <Avatar
+                sx={{
+                  bgcolor: enabledState[key] ? green[500] : red[500],
+                  transition: "background-color 0.2s ease",
+                }}
+              >
+                {key}
+              </Avatar>
+            }
             action={
               <div style={{ marginRight: 15 }}>
                 <FocBoolean
@@ -114,34 +146,40 @@ export const Motors = () => {
                   onLabel="On"
                   offValue="0"
                   onValue="1"
+                  onValueChange={(val) =>
+                    setEnabledState((prev) => ({ ...prev, [key]: val }))
+                  }
                 />
               </div>
             }
           />
           <CardContent>
-            <Accordion>
+            <Accordion defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Typography>Control</Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <MotorControlTypeSwitch motorKey={key} />
-
-                <FocScalar
-                  motorKey={key}
-                  command=""
-                  label="Target"
-                  defaultMin={-20}
-                  defaultMax={20}
-                  step={0.01}
-                />
-                <FocScalar
-                  motorKey={key}
-                  command="CD"
-                  label="Motion loop downsample"
-                  defaultMin={0}
-                  defaultMax={30}
-                  step={1}
-                />
+                <Stack gap={1}>
+                  <MotorControlTypeSwitch motorKey={key} />
+                  <FocScalar
+                    motorKey={key}
+                    command=""
+                    label="Target"
+                    defaultMin={-20}
+                    defaultMax={20}
+                    step={0.01}
+                    compact
+                  />
+                  <FocScalar
+                    motorKey={key}
+                    command="CD"
+                    label="Motion loop downsample"
+                    defaultMin={0}
+                    defaultMax={30}
+                    step={1}
+                    compact
+                  />
+                </Stack>
               </AccordionDetails>
             </Accordion>
             <Accordion>
@@ -149,68 +187,105 @@ export const Motors = () => {
                 <Typography>Velocity PID</Typography>
               </AccordionSummary>
               <AccordionDetails>
+                <Stack gap={1}>
+                  <FocScalar
+                    motorKey={key}
+                    command="VP"
+                    label="Proportional"
+                    defaultMin={0}
+                    defaultMax={5}
+                    step={0.01}
+                    compact
+                  />
+                  <FocScalar
+                    motorKey={key}
+                    command="VI"
+                    label="Integral"
+                    defaultMin={0}
+                    defaultMax={40}
+                    step={0.01}
+                    compact
+                  />
+                  <FocScalar
+                    motorKey={key}
+                    command="VD"
+                    label="Derivative"
+                    defaultMin={0}
+                    defaultMax={1}
+                    step={0.0001}
+                    compact
+                  />
+                  <FocScalar
+                    motorKey={key}
+                    command="VR"
+                    label="Output Ramp"
+                    defaultMin={0}
+                    defaultMax={10000}
+                    step={0.0001}
+                    compact
+                  />
+                  <FocScalar
+                    motorKey={key}
+                    command="VL"
+                    label="Output Limit"
+                    defaultMin={0}
+                    defaultMax={24}
+                    step={0.0001}
+                    compact
+                  />
+                  <FocScalar
+                    motorKey={key}
+                    command="VF"
+                    label="Filtering"
+                    defaultMin={0}
+                    defaultMax={0.2}
+                    step={0.001}
+                    compact
+                  />
+                </Stack>
+            </AccordionDetails>
+          </Accordion>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography>Angle PID</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack gap={1}>
                 <FocScalar
                   motorKey={key}
-                  command="VP"
-                  label="Propotionnal"
+                  command="AP"
+                  label="Proportional"
                   defaultMin={0}
                   defaultMax={5}
                   step={0.01}
+                  compact
                 />
                 <FocScalar
                   motorKey={key}
-                  command="VI"
+                  command="AI"
                   label="Integral"
                   defaultMin={0}
                   defaultMax={40}
                   step={0.01}
+                  compact
                 />
                 <FocScalar
                   motorKey={key}
-                  command="VD"
+                  command="AD"
                   label="Derivative"
                   defaultMin={0}
                   defaultMax={1}
                   step={0.0001}
+                  compact
                 />
                 <FocScalar
                   motorKey={key}
-                  command="VR"
+                  command="AR"
                   label="Output Ramp"
                   defaultMin={0}
                   defaultMax={10000}
                   step={0.0001}
-                />
-                <FocScalar
-                  motorKey={key}
-                  command="VL"
-                  label="Output Limit"
-                  defaultMin={0}
-                  defaultMax={24}
-                  step={0.0001}
-                />
-                <FocScalar
-                  motorKey={key}
-                  command="VF"
-                  label="Filtering"
-                  defaultMin={0}
-                  defaultMax={0.2}
-                  step={0.001}
-                />
-              </AccordionDetails>
-            </Accordion>
-            <Accordion>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Angle PID</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <FocScalar
-                  motorKey={key}
-                  command="AP"
-                  label="Propotionnal"
-                  defaultMin={0}
-                  defaultMax={5}
-                  step={0.01}
+                  compact
                 />
                 <FocScalar
                   motorKey={key}
@@ -219,12 +294,24 @@ export const Motors = () => {
                   defaultMin={0}
                   defaultMax={24}
                   step={0.0001}
+                  compact
                 />
-              </AccordionDetails>
-            </Accordion>
-            <MotorMonitorGraph motorKey={key} />
-          </CardContent>
-        </Card>
+                <FocScalar
+                  motorKey={key}
+                  command="AF"
+                  label="Filtering"
+                  defaultMin={0}
+                  defaultMax={0.2}
+                  step={0.001}
+                  compact
+                />
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+          <div style={{ height: 35 }} />
+          <MotorMonitorGraph motorKey={key} />
+        </CardContent>
+      </Card>
       ))}
     </Stack>
   );

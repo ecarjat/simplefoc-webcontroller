@@ -7,6 +7,7 @@ export type PacketType =
   | "response"
   | "telemetry"
   | "telemetryHeader"
+  | "log"
   | "sync"
   | "alert"
   | "debug"

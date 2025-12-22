@@ -14,6 +14,7 @@ export const FocBoolean = (props: {
   command: string;
   onValue: string;
   offValue: string;
+  onValueChange?: (value: boolean) => void;
 }) => {
   const fullCommandString = `${props.motorKey}${props.command}`;
   const registerName = COMMAND_TO_REGISTER_NAME[props.command];
@@ -34,6 +35,7 @@ export const FocBoolean = (props: {
         return;
       }
       setValue(receivedValue === props.onValue ? true : false);
+      props.onValueChange?.(receivedValue === props.onValue);
     }
   });
 
@@ -45,6 +47,7 @@ export const FocBoolean = (props: {
       const res = await serialPort.readRegister?.(registerId);
       if (res && typeof res.value === "number") {
         setValue(res.value === Number(props.onValue));
+        props.onValueChange?.(res.value === Number(props.onValue));
       }
     };
     fetchVal();
@@ -56,6 +59,7 @@ export const FocBoolean = (props: {
     const handler = (res: any) => {
       if (res.registerId === registerId && typeof res.value === "number") {
         setValue(res.value === Number(props.onValue));
+        props.onValueChange?.(res.value === Number(props.onValue));
       }
     };
     serialPort.on("response", handler);
@@ -75,6 +79,7 @@ export const FocBoolean = (props: {
           )
         );
       setValue(event.target.checked);
+      props.onValueChange?.(event.target.checked);
     } else {
       serialPort?.send(
         `${fullCommandString}${
@@ -82,6 +87,7 @@ export const FocBoolean = (props: {
         }`
       );
       setValue(event.target.checked);
+      props.onValueChange?.(event.target.checked);
     }
   };
 

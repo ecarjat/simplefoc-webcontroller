@@ -12,5 +12,9 @@ export const COMMAND_TO_REGISTER_NAME: Record<string, RegisterName> = {
   VL: "VEL_PID_LIM",
   VF: "VEL_LPF_T",
   AP: "ANG_PID_P",
+  AI: "ANG_PID_I",
+  AD: "ANG_PID_D",
+  AR: "ANG_PID_RAMP",
   AL: "ANG_PID_LIM",
+  AF: "ANG_LPF_T",
 };

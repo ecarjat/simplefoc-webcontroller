@@ -18,6 +18,7 @@ const TYPE_TELEMETRY = "T".charCodeAt(0);
 const TYPE_SYNC = "S".charCodeAt(0);
 const TYPE_ALERT = "A".charCodeAt(0);
 const TYPE_DEBUG = "D".charCodeAt(0);
+const TYPE_LOG = "L".charCodeAt(0);
 
 const TYPE_MAP: Record<number, BinaryPacket["type"]> = {
   [TYPE_REGISTER]: "register",
@@ -27,6 +28,7 @@ const TYPE_MAP: Record<number, BinaryPacket["type"]> = {
   [TYPE_SYNC]: "sync",
   [TYPE_ALERT]: "alert",
   [TYPE_DEBUG]: "debug",
+  [TYPE_LOG]: "log",
 };
 
 type PendingRequest = {

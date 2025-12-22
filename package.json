@@ -16,9 +16,11 @@
     "eventemitter3": "^4.0.7",
     "lodash-es": "^4.17.21",
     "plotly.js": "^2.16.3",
+    "plotly.js-dist-min": "^3.3.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-plotly.js": "^2.6.0",
+    "react-resizable": "^3.0.4",
     "react-window": "^1.8.8",
     "recharts": "^2.1.10"
   },

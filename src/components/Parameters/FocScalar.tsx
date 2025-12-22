@@ -1,4 +1,15 @@
-import { Grid, Slider, TextField, Typography } from "@mui/material";
+import {
+  Grid,
+  Slider,
+  TextField,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  IconButton,
+} from "@mui/material";
 import {
   Accordion,
   AccordionDetails,
@@ -14,6 +25,8 @@ import { useParameterSettings } from "../../lib/useParameterSettings";
 import { COMMAND_TO_REGISTER_NAME } from "../../lib/commandRegisterMap";
 import { REGISTER_BY_NAME } from "../../lib/registerMap";
 import { useSerialPort } from "../../lib/serialContext";
+import SettingsIcon from "@mui/icons-material/Settings";
+import Box from "@mui/material/Box";
 
 export const FocScalar = (props: {
   motorKey: string;
@@ -22,6 +35,7 @@ export const FocScalar = (props: {
   defaultMin: number;
   defaultMax: number;
   step: number;
+  compact?: boolean;
 }) => {
   const fullCommandString = `${props.motorKey}${props.command}`;
   const { expanded, setExpanded, min, setMin, max, setMax } =
@@ -29,6 +43,7 @@ export const FocScalar = (props: {
   const registerName = COMMAND_TO_REGISTER_NAME[props.command];
   const registerId = registerName ? REGISTER_BY_NAME[registerName].id : null;
   const serial = useSerialPort();
+  const [boundsOpen, setBoundsOpen] = useState(false);
 
   const [targetValue, setTargetValue] = useState<number | null>(null); // value sent to controller
   const [value, setValue] = useState<number | null>(null); // value acknowledged by controller, for now not used
@@ -105,6 +120,57 @@ export const FocScalar = (props: {
     setTargetValue(e.target.value);
     changeValue(e.target.value);
   };
+
+  if (props.compact) {
+    return (
+      <>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%" }}>
+          <Typography sx={{ minWidth: 110 }}>{props.label}</Typography>
+          <Slider
+            value={typeof targetValue === "number" ? targetValue : 0}
+            onChange={handleSliderChange}
+            min={min}
+            max={max}
+            step={props.step}
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            value={typeof targetValue === "number" ? targetValue : 0}
+            onChange={handleSliderChange}
+            variant="standard"
+            size="small"
+            type="number"
+            sx={{ width: 90 }}
+          />
+          <IconButton onClick={() => setBoundsOpen(true)} size="small">
+            <SettingsIcon fontSize="small" />
+          </IconButton>
+        </Box>
+        <Dialog open={boundsOpen} onClose={() => setBoundsOpen(false)}>
+          <DialogTitle>Bounds for {props.label}</DialogTitle>
+          <DialogContent sx={{ display: "flex", gap: 2, mt: 1 }}>
+            <TextField
+              label="Min"
+              value={min}
+              onChange={(e) => setMin(Number(e.target.value))}
+              type="number"
+              variant="standard"
+            />
+            <TextField
+              label="Max"
+              value={max}
+              onChange={(e) => setMax(Number(e.target.value))}
+              type="number"
+              variant="standard"
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setBoundsOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+      </>
+    );
+  }
 
   return (
     <Accordion

@@ -1405,6 +1405,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"clsx@npm:^2.1.1":
+  version: 2.1.1
+  resolution: "clsx@npm:2.1.1"
+  checksum: acd3e1ab9d8a433ecb3cc2f6a05ab95fe50b4a3cfc5ba47abb6cbf3754585fcb87b84e90c822a1f256c4198e3b41c7f6c391577ffc8678ad587fc0976b24fd57
+  languageName: node
+  linkType: hard
+
 "color-alpha@npm:1.0.4":
   version: 1.0.4
   resolution: "color-alpha@npm:1.0.4"
@@ -3930,6 +3937,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"plotly.js-dist-min@npm:^3.3.1":
+  version: 3.3.1
+  resolution: "plotly.js-dist-min@npm:3.3.1"
+  checksum: a67b1cf679424070760aef47a252f0b0332ce19684e575c8db2cc9103f3cb457e6d7d500c4d95c29119597853e368b8d11885efe01b2441c7c847c89fbae68de
+  languageName: node
+  linkType: hard
+
 "plotly.js@npm:^2.16.3":
   version: 2.16.3
   resolution: "plotly.js@npm:2.16.3"
@@ -4068,7 +4082,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prop-types@npm:^15.6.2, prop-types@npm:^15.8.1":
+"prop-types@npm:15.x, prop-types@npm:^15.6.2, prop-types@npm:^15.8.1":
   version: 15.8.1
   resolution: "prop-types@npm:15.8.1"
   dependencies:
@@ -4135,6 +4149,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-draggable@npm:^4.0.3":
+  version: 4.5.0
+  resolution: "react-draggable@npm:4.5.0"
+  dependencies:
+    clsx: ^2.1.1
+    prop-types: ^15.8.1
+  peerDependencies:
+    react: ">= 16.3.0"
+    react-dom: ">= 16.3.0"
+  checksum: a5563ed8142ab77e9e68af9b5a57484358462bae76368691362419d7fb4d9fba73300b5c5d1346db6551d88743c68746dc18bc035276db1539d0ad0aff6580cc
+  languageName: node
+  linkType: hard
+
 "react-is@npm:^16.10.2, react-is@npm:^16.13.1, react-is@npm:^16.7.0":
   version: 16.13.1
   resolution: "react-is@npm:16.13.1"
@@ -4172,6 +4199,18 @@ __metadata:
   version: 0.13.0
   resolution: "react-refresh@npm:0.13.0"
   checksum: 1cf2b87ed99e1d388aa3923078bc30cd3ce43ee86e8936944e961d3643c6e85da41ebed6a0996e8bdad75a0d2ce3b7e10638b45018231380d4a174f63a451f75
+  languageName: node
+  linkType: hard
+
+"react-resizable@npm:^3.0.4":
+  version: 3.0.5
+  resolution: "react-resizable@npm:3.0.5"
+  dependencies:
+    prop-types: 15.x
+    react-draggable: ^4.0.3
+  peerDependencies:
+    react: ">= 16.3"
+  checksum: 616a10205acfaf8cc3aa0824b60f6d037eef87143d8f338cf826deb74a353db9b9baad67a65dc8535fe90840bfc3e1b8a901f9c247033ffeec2f30405ac7528e
   languageName: node
   linkType: hard
 
@@ -4684,9 +4723,11 @@ __metadata:
     eventemitter3: ^4.0.7
     lodash-es: ^4.17.21
     plotly.js: ^2.16.3
+    plotly.js-dist-min: ^3.3.1
     react: ^18.0.0
     react-dom: ^18.0.0
     react-plotly.js: ^2.6.0
+    react-resizable: ^3.0.4
     react-window: ^1.8.8
     recharts: ^2.1.10
     typescript: ^4.6.3

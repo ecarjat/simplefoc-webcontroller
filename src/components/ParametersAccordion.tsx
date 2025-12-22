@@ -10,11 +10,16 @@ export const Accordion = styled((props: AccordionProps) => (
   <MuiAccordion disableGutters elevation={0} square {...props} />
 ))(({ theme }) => ({
   border: `1px solid ${theme.palette.divider}`,
-  "&:not(:last-child)": {
-    borderBottom: 0,
+  "& + .MuiAccordion-root": {
+    borderTop: 0,
   },
   "&:before": {
     display: "none",
+  },
+  "&:last-of-type": {
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
   },
 }));
 
