@@ -28,6 +28,8 @@ import { useSerialPort } from "../../lib/serialContext";
 import SettingsIcon from "@mui/icons-material/Settings";
 import Box from "@mui/material/Box";
 
+const NUMBER_INPUT_REGEX = /^-?\d*(\.\d*)?$/;
+
 export const FocScalar = (props: {
   motorKey: string;
   command: string;
@@ -47,6 +49,7 @@ export const FocScalar = (props: {
 
   const [targetValue, setTargetValue] = useState<number | null>(null); // value sent to controller
   const [value, setValue] = useState<number | null>(null); // value acknowledged by controller, for now not used
+  const [displayValue, setDisplayValue] = useState<string>("0");
   const serialRef = useSerialPortRef();
 
   useSerialLineEvent((line) => {
@@ -76,6 +79,7 @@ export const FocScalar = (props: {
         if (typeof rawVal === "number") {
           setValue(rawVal);
           setTargetValue((prev) => (prev === null ? rawVal : prev));
+          setDisplayValue(rawVal.toFixed(6));
         }
       }
     };
@@ -86,6 +90,7 @@ export const FocScalar = (props: {
         if (typeof rawVal === "number") {
           setValue(rawVal);
           setTargetValue((prev) => (prev === null ? rawVal : prev));
+          setDisplayValue(rawVal.toFixed(6));
         }
       }
     };
@@ -118,7 +123,35 @@ export const FocScalar = (props: {
       return;
     }
     setTargetValue(e.target.value);
+    setDisplayValue(Number(e.target.value).toFixed(6));
     changeValue(e.target.value);
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (!NUMBER_INPUT_REGEX.test(val)) return;
+    setDisplayValue(val);
+  };
+
+  useEffect(() => {
+    if (typeof targetValue === "number") {
+      setDisplayValue(targetValue.toFixed(6));
+    }
+  }, [targetValue]);
+
+  const commitDisplayValue = () => {
+    if (displayValue === "" || displayValue === "-" || displayValue === "." || displayValue === "-.") {
+      setDisplayValue(
+        typeof targetValue === "number" ? targetValue.toFixed(6) : "0"
+      );
+      return;
+    }
+    const num = Number(displayValue);
+    if (!isNaN(num)) {
+      setTargetValue(num);
+      changeValue(num);
+      setDisplayValue(num.toFixed(6));
+    }
   };
 
   if (props.compact) {
@@ -135,11 +168,15 @@ export const FocScalar = (props: {
             sx={{ flex: 1 }}
           />
           <TextField
-            value={typeof targetValue === "number" ? targetValue : 0}
-            onChange={handleSliderChange}
+            value={displayValue}
+            onChange={handleTextChange}
             variant="standard"
             size="small"
-            type="number"
+            type="text"
+            onBlur={commitDisplayValue}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitDisplayValue();
+            }}
             sx={{ width: 90 }}
           />
           <IconButton onClick={() => setBoundsOpen(true)} size="small">
@@ -185,11 +222,15 @@ export const FocScalar = (props: {
         <Typography>{props.label}</Typography>
         <div style={{ flex: 1 }} />
         <TextField
-          value={typeof targetValue === "number" ? targetValue : 0}
-          onChange={handleSliderChange}
+          value={displayValue}
+          onChange={handleTextChange}
           variant="standard"
           sx={{ marginRight: 2 }}
-          type="number"
+          type="text"
+          onBlur={commitDisplayValue}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitDisplayValue();
+          }}
         />
       </AccordionSummary>
       <AccordionDetails>
@@ -218,7 +259,7 @@ export const FocScalar = (props: {
           </Grid>
           <Grid item>
             <TextField
-              value={max}
+              value={Number(max.toFixed(6))}
               onChange={(e) => setMax(Number(e.target.value))}
               size="small"
               type="number"
