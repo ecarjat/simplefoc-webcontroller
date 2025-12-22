@@ -3,5 +3,17 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()]
+  plugins: [react()],
+  resolve: {
+    alias: {
+      buffer: 'buffer',
+      stream: 'stream-browserify'
+    }
+  },
+  define: {
+    global: 'globalThis'
+  },
+  optimizeDeps: {
+    include: ['buffer']
+  }
 })

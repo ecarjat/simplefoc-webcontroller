@@ -60,7 +60,7 @@ export const SerialCommandPrompt = () => {
       if (activeIndex === 1) {
         return { options: ["0", "1", "2", "3"], activeToken: activeTokenRaw };
       }
-      const looksLikeFreq = /hz$/i.test(activeToken);
+      const looksLikeFreq = /hz$/i.test(activeTokenRaw);
       return {
         options: looksLikeFreq ? FREQ : REGISTER_NAME_LIST,
         activeToken: activeTokenRaw,

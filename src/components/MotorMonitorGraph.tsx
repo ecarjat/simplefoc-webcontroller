@@ -5,9 +5,10 @@ import {
   FormControlLabel,
   Box,
   Typography,
+  Button,
 } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Plotly from "plotly.js-dist-min";
+import Plotly from "plotly.js";
 import { useSerialLineEvent } from "../lib/useSerialLineEvent";
 import { useSerialPort } from "../lib/serialContext";
 import {
@@ -52,6 +53,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
   const plotDivRef = useRef<Plotly.PlotlyHTMLElement | null>(null);
   const rendererRef = useRef<PlotlyRenderer | null>(null);
   const pipelineRef = useRef<TelemetryPipeline | null>(null);
+  const [frozen, setFrozen] = useState(false);
   const [frequencyHz, setFrequencyHz] = useState(50);
   const [plotHeight, setPlotHeight] = useState(400);
   const defaultTracesRef = useRef<TraceConfig[]>([
@@ -153,6 +155,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
   const perfConfig = useMemo(
     () => ({
       ...defaultTelemetryConfig,
+      traceType: "scatter" as const,
       renderHz: 120,
       bufferSeconds: 0.25,
       maxDrainPerTick: 50,
@@ -283,7 +286,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
       div.style.width = "100%";
       div.style.height = "100%";
       plotContainerRef.current.appendChild(div);
-      plotDivRef.current = div as Plotly.PlotlyHTMLElement;
+      plotDivRef.current = div as unknown as Plotly.PlotlyHTMLElement;
     }
     const enabledTraces = traces.filter((t) => t.enabled);
     rendererRef.current = new PlotlyRenderer({
@@ -336,7 +339,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
   useEffect(() => {
     if (!serial || serial.mode !== "binary") return;
     const handler = (data: TelemetryData) => {
-      if (!pipelineRef.current) return;
+      if (!pipelineRef.current || frozen) return;
       // map values in order of current enabled traces
       const enabled = traces.filter((t) => t.enabled);
       const mappedValues = enabled.map((t) => {
@@ -353,11 +356,11 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
     return () => {
       serial.off("telemetry", handler);
     };
-  }, [serial, traces]);
+  }, [serial, traces, frozen]);
 
   // ASCII fallback: parse M lines and push
   useSerialLineEvent((line) => {
-    if (!pipelineRef.current || serial?.mode !== "ascii") return;
+    if (!pipelineRef.current || serial?.mode !== "ascii" || frozen) return;
     if (line.content.startsWith(`${motorKey}M`)) {
       const parts = line.content.slice(2).split("\t").map(Number);
       if (!parts.length) return;
@@ -370,14 +373,23 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
   return (
     <Stack direction="row" spacing={2} alignItems="flex-start">
       <Box sx={{ minWidth: 320, flexShrink: 0 }}>
-        <TextField
-          label="Telemetry rate (Hz)"
-          type="number"
-          size="small"
-          value={frequencyHz}
-          onChange={(e) => setFrequencyHz(Number(e.target.value))}
-          sx={{ marginBottom: 1, width: "100%" }}
-        />
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+          <TextField
+            label="Telemetry rate (Hz)"
+            type="number"
+            size="small"
+            value={frequencyHz}
+            onChange={(e) => setFrequencyHz(Number(e.target.value))}
+            sx={{ flex: 1 }}
+          />
+          <Button
+            variant={frozen ? "contained" : "outlined"}
+            color={frozen ? "warning" : "primary"}
+            onClick={() => setFrozen((f) => !f)}
+          >
+            Freeze
+          </Button>
+        </Stack>
         <Stack spacing={1}>
           {primaryOptions.map((opt, idx) =>
             renderTraceRow(opt, idx, traces, setTraces)
@@ -435,14 +447,14 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
           axis="y"
           minConstraints={[100, 300]}
           maxConstraints={[Infinity, 900]}
-          handle={(h, ref) => (
+          handle={(h: any, ref: any) => (
             <span
               ref={ref}
               className={`react-resizable-handle react-resizable-handle-${h}`}
               style={{ height: 8 }}
             />
           )}
-          onResize={(_, data) => {
+          onResize={(_: any, data: { size: { height: number; width: number } }) => {
             setPlotHeight(data.size.height);
             if (plotDivRef.current) {
               Plotly.Plots.resize(plotDivRef.current);

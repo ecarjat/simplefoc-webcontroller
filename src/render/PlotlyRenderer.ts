@@ -1,4 +1,4 @@
-import Plotly from "plotly.js-dist-min";
+import Plotly from "plotly.js";
 import { DownsampleMode, TelemetryConfig } from "../telemetry/config";
 import { RenderBatch } from "../telemetry/BufferManager";
 
@@ -37,16 +37,18 @@ export class PlotlyRenderer {
 
   async init(div: Plotly.PlotlyHTMLElement) {
     this.graphDiv = div;
-    const initData = this.traces.map((trace, idx) => ({
+    const hasY2 = this.traces.some((t) => t.axis === "y2");
+    const hasY1 = this.traces.some((t) => t.axis !== "y2");
+    const initData: Partial<Plotly.Data>[] = this.traces.map((trace) => ({
       x: [],
       y: [],
       type: this.config.traceType,
-      mode: "lines",
+      mode: "lines" as const,
       name: trace.name,
       line: { color: trace.color },
       yaxis: trace.axis || "y",
     }));
-    const layout = this.buildLayout();
+    const layout = this.buildLayout({ hasY1, hasY2 });
     await Plotly.newPlot(div, initData, layout);
   }
 
@@ -59,7 +61,14 @@ export class PlotlyRenderer {
   }
 
   render(batch: RenderBatch) {
-    if (!this.graphDiv || !batch.timestamps.length) return;
+    if (
+      !this.graphDiv ||
+      !batch.timestamps.length ||
+      this.traces.length === 0 ||
+      batch.traces.length === 0
+    ) {
+      return;
+    }
     const strideN = this.config.downsampleMode === "stride" ? this.config.strideN : 1;
     const xs =
       strideN > 1 ? downsampleStride(batch.timestamps, strideN) : batch.timestamps;
@@ -75,13 +84,21 @@ export class PlotlyRenderer {
       batch.traces.map((_, idx) => idx),
       this.maxPoints
     );
-    Plotly.relayout(this.graphDiv, {
-      "yaxis.autorange": true,
-      "yaxis2.autorange": true,
-    });
+    const hasY2 = this.traces.some((t) => t.axis === "y2");
+    const hasY1 = this.traces.some((t) => t.axis !== "y2");
+    const relayoutUpdate: Record<string, any> = {};
+    relayoutUpdate["yaxis.autorange"] = true;
+    relayoutUpdate["yaxis.visible"] = hasY1;
+    if (hasY2) {
+      relayoutUpdate["yaxis2.autorange"] = true;
+      relayoutUpdate["yaxis2.visible"] = true;
+    } else {
+      relayoutUpdate["yaxis2.visible"] = false;
+    }
+    Plotly.relayout(this.graphDiv, relayoutUpdate);
   }
 
-  private buildLayout() {
+  private buildLayout({ hasY1, hasY2 }: { hasY1: boolean; hasY2: boolean }) {
     const layout: Partial<Plotly.Layout> = {
       showlegend: false,
       margin: { t: 10, r: 60, b: 40, l: 50 },
@@ -90,12 +107,14 @@ export class PlotlyRenderer {
     (layout as any).yaxis = {
       title: "Y1",
       autorange: true,
+      visible: hasY1,
     };
     (layout as any).yaxis2 = {
       title: "Y2",
       autorange: true,
       overlaying: "y",
       side: "right",
+      visible: hasY2,
     };
     return layout;
   }

@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Buffer } from "buffer";
 import App from "./App";
 import "./index.css";
 
@@ -11,6 +12,9 @@ import "@fontsource/roboto/700.css";
 import CssBaseline from "@mui/material/CssBaseline";
 
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+
+// Ensure Buffer is available for libraries expecting Node globals (e.g., plotly dependencies)
+(window as any).Buffer = Buffer;
 
 const darkTheme = createTheme({
   palette: {

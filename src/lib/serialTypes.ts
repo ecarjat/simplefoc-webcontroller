@@ -1,4 +1,5 @@
 import EventEmitter from "eventemitter3";
+import { SerialLine } from "../simpleFoc/serial";
 
 export type SerialMode = "ascii" | "binary";
 
@@ -42,7 +43,7 @@ export type SerialState = "closed" | "open";
 
 export interface SerialConnection extends EventEmitter<{
   stateChange: () => void;
-  line: (line: string) => void;
+  line: (line: SerialLine) => void;
   packet: (packet: BinaryPacket) => void;
   response: (res: RegisterResponse) => void;
   telemetryHeader: (header: TelemetryHeader) => void;

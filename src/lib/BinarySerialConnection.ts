@@ -291,7 +291,16 @@ export class BinarySerialConnection extends EventEmitter<any> implements SerialC
     opts?: { expectResponse?: boolean }
   ) {
     const def = REGISTER_BY_ID[registerId];
-    const payloadValue = def ? encodeRegisterValue(def, value) : value;
+    let payloadValue: Uint8Array;
+    if (def) {
+      payloadValue = encodeRegisterValue(def, value);
+    } else if (value instanceof Uint8Array) {
+      payloadValue = value;
+    } else if (Array.isArray(value)) {
+      payloadValue = Uint8Array.from(value);
+    } else {
+      payloadValue = Uint8Array.from([value]);
+    }
     const payload = concat([Uint8Array.from([registerId]), payloadValue]);
     await this.writeFrame(TYPE_REGISTER, payload);
     if (opts?.expectResponse) {
