@@ -31,8 +31,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
-      - run: npm run build
+      - run: yarn install --frozen-lockfile
+      - run: yarn build
 
       - uses: actions/upload-pages-artifact@v3
         with:
