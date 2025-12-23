@@ -37,12 +37,16 @@ export const encodeRegisterValue = (
 };
 
 const decodePrimitive = (type: RegisterPrimitive, payload: DataView, offset: number) => {
+  const remaining = payload.byteLength - offset;
   switch (type) {
     case "u8":
+      if (remaining < 1) return { value: 0, size: 0 };
       return { value: payload.getUint8(offset), size: 1 };
     case "u32":
+      if (remaining < 4) return { value: 0, size: 0 };
       return { value: payload.getUint32(offset, true), size: 4 };
     case "f32":
+      if (remaining < 4) return { value: 0, size: 0 };
       return { value: payload.getFloat32(offset, true), size: 4 };
   }
 };
@@ -61,6 +65,9 @@ export const decodeRegisterValue = (
     let cursor = offset;
     encoding.parts.forEach((part) => {
       const decoded = decodePrimitive(part, view, cursor);
+      if (decoded.size === 0) {
+        return;
+      }
       values.push(decoded.value);
       cursor += decoded.size;
     });

@@ -6,6 +6,7 @@ import {
   Box,
   Typography,
   Button,
+  Tooltip,
 } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Plotly from "plotly.js";
@@ -45,6 +46,7 @@ type TraceConfig = {
   color: string;
   enabled: boolean;
   axis: "y" | "y2";
+  tooltip?: string;
 };
 
 export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
@@ -103,6 +105,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
       color: COLORS[idx % COLORS.length],
       enabled: defaultTracesRef.current.some((t) => t.id === def.id),
       axis: "y",
+      tooltip: def.tooltip,
     });
 
     const primaryIds = [
@@ -182,7 +185,9 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
         ...opt,
         color: opt.color || COLORS[idx % COLORS.length],
         enabled: false,
+        tooltip: opt.tooltip,
       } as TraceConfig);
+    const tooltip = current.tooltip ?? opt.tooltip;
     return (
       <Stack
         key={opt.id}
@@ -197,38 +202,42 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
         >
           {current.name.slice(0, 3)}
         </Typography>
-        <FormControlLabel
-          sx={{ flex: 1 }}
-          control={
-            <Checkbox
-              checked={current.enabled}
-              onChange={(e) =>
-                setTracesState((prev) => {
-                  const next = [...prev];
-                  const existingIndex = next.findIndex((t) => t.id === opt.id);
-                  if (existingIndex >= 0) {
-                    next[existingIndex] = {
-                      ...next[existingIndex],
-                      enabled: e.target.checked,
-                    };
-                  } else {
-                    next.push({
-                      ...opt,
-                      color: COLORS[idx % COLORS.length],
-                      enabled: e.target.checked,
-                    });
-                  }
-                  return next;
-                })
-              }
-            />
-          }
-          label={
-            <Typography variant="body2" sx={{ color: current.color }}>
-              {opt.name}
-            </Typography>
-          }
-        />
+        <Tooltip title={tooltip || ""} disableHoverListener={!tooltip}>
+          <FormControlLabel
+            sx={{ flex: 1 }}
+            control={
+              <Checkbox
+                checked={current.enabled}
+                onChange={(e) =>
+                  setTracesState((prev) => {
+                    const next = [...prev];
+                    const existingIndex = next.findIndex((t) => t.id === opt.id);
+                    if (existingIndex >= 0) {
+                      next[existingIndex] = {
+                        ...next[existingIndex],
+                        tooltip: tooltip,
+                        enabled: e.target.checked,
+                      };
+                    } else {
+                      next.push({
+                        ...opt,
+                        color: COLORS[idx % COLORS.length],
+                        tooltip: opt.tooltip,
+                        enabled: e.target.checked,
+                      });
+                    }
+                    return next;
+                  })
+                }
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ color: current.color }}>
+                {opt.name}
+              </Typography>
+            }
+          />
+        </Tooltip>
         <TextField
           type="color"
           size="small"

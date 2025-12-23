@@ -176,7 +176,7 @@ export class BinarySerialConnection extends EventEmitter<any> implements SerialC
     if (!payload.length) return null;
     const telemetryId = payload[0];
     const registers: { motor: number; register: number }[] = [];
-    for (let i = 1; i < payload.length; i += 2) {
+    for (let i = 1; i + 1 < payload.length; i += 2) {
       registers.push({ motor: payload[i], register: payload[i + 1] });
     }
     return {
@@ -242,6 +242,9 @@ export class BinarySerialConnection extends EventEmitter<any> implements SerialC
       } else {
         await this.writeFrame(TYPE_REGISTER, action.bytes);
       }
+    } else if (action.kind === "calibration") {
+      // 'C' (0x43) followed by 0x02 as per calibration command
+      await this.writeFrame(TYPE_REGISTER, Uint8Array.from([0x43, 0x02]));
     } else if (action.kind === "read") {
       await this.readRegister(action.registerId);
     } else if (action.kind === "write") {

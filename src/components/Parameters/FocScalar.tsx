@@ -27,6 +27,7 @@ import { REGISTER_BY_NAME } from "../../lib/registerMap";
 import { useSerialPort } from "../../lib/serialContext";
 import SettingsIcon from "@mui/icons-material/Settings";
 import Box from "@mui/material/Box";
+import Tooltip from "@mui/material/Tooltip";
 
 const NUMBER_INPUT_REGEX = /^-?\d*(\.\d*)?$/;
 
@@ -44,6 +45,7 @@ export const FocScalar = (props: {
     useParameterSettings(fullCommandString, props.defaultMin, props.defaultMax);
   const registerName = COMMAND_TO_REGISTER_NAME[props.command];
   const registerId = registerName ? REGISTER_BY_NAME[registerName].id : null;
+  const registerTooltip = registerName ? REGISTER_BY_NAME[registerName]?.tooltip : undefined;
   const serial = useSerialPort();
   const [boundsOpen, setBoundsOpen] = useState(false);
 
@@ -158,7 +160,9 @@ export const FocScalar = (props: {
     return (
       <>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%" }}>
-          <Typography sx={{ minWidth: 110 }}>{props.label}</Typography>
+          <Tooltip title={registerTooltip || ""} disableHoverListener={!registerTooltip}>
+            <Typography sx={{ minWidth: 110 }}>{props.label}</Typography>
+          </Tooltip>
           <Slider
             value={typeof targetValue === "number" ? targetValue : 0}
             onChange={handleSliderChange}
@@ -219,19 +223,23 @@ export const FocScalar = (props: {
         expandIcon={<ExpandMoreIcon />}
         sx={{ alignItems: "center" }}
       >
-        <Typography>{props.label}</Typography>
+        <Tooltip title={registerTooltip || ""} disableHoverListener={!registerTooltip}>
+          <Typography>{props.label}</Typography>
+        </Tooltip>
         <div style={{ flex: 1 }} />
-        <TextField
-          value={displayValue}
-          onChange={handleTextChange}
-          variant="standard"
-          sx={{ marginRight: 2 }}
-          type="text"
-          onBlur={commitDisplayValue}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitDisplayValue();
-          }}
-        />
+        <Tooltip title={registerTooltip || ""} disableHoverListener={!registerTooltip}>
+          <TextField
+            value={displayValue}
+            onChange={handleTextChange}
+            variant="standard"
+            sx={{ marginRight: 2 }}
+            type="text"
+            onBlur={commitDisplayValue}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitDisplayValue();
+            }}
+          />
+        </Tooltip>
       </AccordionSummary>
       <AccordionDetails>
         <Grid container spacing={2} alignItems="center">

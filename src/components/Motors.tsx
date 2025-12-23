@@ -4,8 +4,10 @@ import {
   CardContent,
   CardHeader,
   CircularProgress,
+  TextField,
   Stack,
   Typography,
+  Tooltip,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
@@ -24,8 +26,132 @@ import { useSerialPortOpenStatus } from "../lib/serialContext";
 import { MotorControlTypeSwitch } from "./Parameters/MotorControlTypeSwitch";
 import { useSerialPort } from "../lib/serialContext";
 import { REGISTER_BY_NAME } from "../lib/registerMap";
+import Box from "@mui/material/Box";
+import { useSerialPortRef } from "../lib/serialContext";
 
 const MOTOR_OUTPUT_REGEX = /^\?(\w):(.*)\r?$/;
+const NUMBER_INPUT_REGEX = /^-?\d*(\.\d*)?$/;
+
+const ParameterRegisterInput = ({
+  motorKey,
+  registerName,
+  label,
+}: {
+  motorKey: string;
+  registerName: keyof typeof REGISTER_BY_NAME;
+  label: string;
+}) => {
+  const serial = useSerialPort();
+  const serialRef = useSerialPortRef();
+  const registerId = REGISTER_BY_NAME[registerName]?.id ?? null;
+  const [value, setValue] = useState<number | null>(null);
+  const [display, setDisplay] = useState<string>("0");
+  const encoding = REGISTER_BY_NAME[registerName]?.encoding;
+  const formatValue = (val: number) => {
+    if (encoding === "u8" || encoding === "u32") {
+      return Math.round(val).toString();
+    }
+    return val.toFixed(6);
+  };
+
+  useEffect(() => {
+    if (!serial || serial.mode !== "binary" || registerId === null) return;
+    let cancelled = false;
+    let gotResponse = false;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    const fetchVal = async () => {
+      await serial.setMotorAddress?.(Number(motorKey));
+      const res = await serial.readRegister?.(registerId);
+      if (cancelled) return;
+      const rawVal = Array.isArray(res?.value) ? res?.value[0] : res?.value;
+      if (typeof rawVal === "number") {
+        gotResponse = true;
+        setValue(rawVal);
+        setDisplay(formatValue(rawVal));
+      } else if (!gotResponse && !cancelled) {
+        retryTimeout = setTimeout(fetchVal, 2000);
+      }
+    };
+    fetchVal();
+    const handler = (res: any) => {
+      if (res.registerId === registerId) {
+        const rawVal = Array.isArray(res.value) ? res.value[0] : res.value;
+        if (typeof rawVal === "number") {
+          gotResponse = true;
+          if (retryTimeout) {
+            clearTimeout(retryTimeout);
+            retryTimeout = null;
+          }
+          setValue(rawVal);
+          setDisplay(formatValue(rawVal));
+        }
+      }
+    };
+    serial.on("response", handler);
+    return () => {
+      cancelled = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
+      serial.off("response", handler);
+    };
+  }, [serial, registerId, motorKey]);
+
+  useEffect(() => {
+    if (typeof value === "number") {
+      setDisplay(formatValue(value));
+    }
+  }, [value]);
+
+  const commit = async () => {
+    if (display === "" || display === "-" || display === "." || display === "-.") {
+      setDisplay(value !== null ? formatValue(value) : "0");
+      return;
+    }
+    const num = Number(display);
+    if (isNaN(num)) return;
+    setValue(num);
+    if (serialRef.current?.mode === "binary" && registerId !== null) {
+      await serialRef.current
+        ?.setMotorAddress?.(Number(motorKey))
+        .then(() =>
+          serialRef.current?.writeRegister?.(registerId, num, {
+            expectResponse: true,
+          })
+        );
+    } else {
+      serialRef.current?.send?.(`set ${registerName} ${num}`);
+    }
+  };
+
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (!NUMBER_INPUT_REGEX.test(val)) return;
+    setDisplay(val);
+  };
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        {label}
+      </Typography>
+      <Tooltip
+        title={REGISTER_BY_NAME[registerName]?.tooltip || ""}
+        disableHoverListener={!REGISTER_BY_NAME[registerName]?.tooltip}
+      >
+        <TextField
+          size="small"
+          type="text"
+          value={display}
+          onChange={onChange}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+          inputProps={{ style: { textAlign: "right" } }}
+        />
+      </Tooltip>
+    </Box>
+  );
+};
 
 export const Motors = () => {
   const [motors, setMotors] = useState<{ [key: string]: string }>({});
@@ -249,11 +375,11 @@ export const Motors = () => {
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography>Angle PID</Typography>
             </AccordionSummary>
-            <AccordionDetails>
-              <Stack gap={1}>
-                <FocScalar
-                  motorKey={key}
-                  command="AP"
+          <AccordionDetails>
+            <Stack gap={1}>
+              <FocScalar
+                motorKey={key}
+                command="AP"
                   label="Proportional"
                   defaultMin={0}
                   defaultMax={5}
@@ -306,6 +432,71 @@ export const Motors = () => {
                   compact
                 />
               </Stack>
+            </AccordionDetails>
+          </Accordion>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography>Parameters</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box sx={{ display: "flex", gap: 2 }}>
+                <Stack spacing={2} sx={{ flex: 1 }}>
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="VOLTAGE_LIMIT"
+                    label="Voltage Limit"
+                  />
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="CURRENT_LIMIT"
+                    label="Current Limit"
+                  />
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="VELOCITY_LIMIT"
+                    label="Velocity Limit"
+                  />
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="DRIVER_VOLTAGE_LIMIT"
+                    label="Driver Voltage Limit"
+                  />
+                </Stack>
+                <Stack spacing={2} sx={{ flex: 1 }}>
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="PWM_FREQUENCY"
+                    label="PWM Frequency"
+                  />
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="DRIVER_VOLTAGE_PSU"
+                    label="Driver Voltage PSU"
+                  />
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="POLE_PAIRS"
+                    label="Pole Pairs"
+                  />
+                </Stack>
+                <Stack spacing={2} sx={{ flex: 1 }}>
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="PHASE_RESISTANCE"
+                    label="Phase Resistance"
+                  />
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="KV"
+                    label="KV"
+                  />
+                  <ParameterRegisterInput
+                    motorKey={key}
+                    registerName="INDUCTANCE"
+                    label="Inductance"
+                  />
+                </Stack>
+              </Box>
             </AccordionDetails>
           </Accordion>
           <div style={{ height: 35 }} />

@@ -26,7 +26,7 @@ export const SerialCommandPrompt = () => {
   };
 
   const suggestionState = useMemo(() => {
-    const COMMANDS = ["get", "set", "telemetry", "raw", "sync"];
+    const COMMANDS = ["get", "set", "telemetry", "raw", "sync", "calibration"];
     const FREQ = ["10Hz", "25Hz", "50Hz", "100Hz", "200Hz"];
 
     const hasTrailingSpace = /\s$/.test(promptValue);
@@ -138,13 +138,20 @@ export const SerialCommandPrompt = () => {
           </>
         )}
         {serial?.mode === "binary" && (
-          <Chip
-            clickable
-            label="Telemetry (binary)"
-            onClick={handleStoredCommandClick(
-              "telemetry 0 TARGET POSITION SENSOR_ANGLE VELOCITY 50Hz"
-            )}
-          />
+          <>
+            <Chip
+              clickable
+              label="Telemetry (binary)"
+              onClick={handleStoredCommandClick(
+                "telemetry 0 TARGET POSITION SENSOR_ANGLE VELOCITY 50Hz"
+              )}
+            />
+            <Chip
+              clickable
+              label="Calibration"
+              onClick={handleStoredCommandClick("calibration")}
+            />
+          </>
         )}
       </Stack>
     </Stack>
