@@ -4,6 +4,7 @@ import {
   CardContent,
   CardHeader,
   CircularProgress,
+  Button,
   TextField,
   Stack,
   Typography,
@@ -24,10 +25,9 @@ import { FocScalar } from "./Parameters/FocScalar";
 import { MotorMonitorGraph } from "./MotorMonitorGraph";
 import { useSerialPortOpenStatus } from "../lib/serialContext";
 import { MotorControlTypeSwitch } from "./Parameters/MotorControlTypeSwitch";
-import { useSerialPort } from "../lib/serialContext";
+import { useSerialPort, useSerialPortRef } from "../lib/serialContext";
 import { REGISTER_BY_NAME } from "../lib/registerMap";
 import Box from "@mui/material/Box";
-import { useSerialPortRef } from "../lib/serialContext";
 
 const MOTOR_OUTPUT_REGEX = /^\?(\w):(.*)\r?$/;
 const NUMBER_INPUT_REGEX = /^-?\d*(\.\d*)?$/;
@@ -158,6 +158,7 @@ export const Motors = () => {
   const [enabledState, setEnabledState] = useState<Record<string, boolean>>({});
   const portOpen = useSerialPortOpenStatus();
   const serial = useSerialPort();
+  const serialRef = useSerialPortRef();
 
   useEffect(() => {
     setMotors({});
@@ -263,7 +264,16 @@ export const Motors = () => {
               </Avatar>
             }
             action={
-              <div style={{ marginRight: 15 }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mr: 2 }}>
+                {serial?.mode === "binary" && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => serialRef.current?.send?.("save")}
+                  >
+                    Save
+                  </Button>
+                )}
                 <FocBoolean
                   command="E"
                   label="Enabled"
@@ -276,7 +286,7 @@ export const Motors = () => {
                     setEnabledState((prev) => ({ ...prev, [key]: val }))
                   }
                 />
-              </div>
+              </Stack>
             }
           />
           <CardContent>
@@ -499,7 +509,7 @@ export const Motors = () => {
               </Box>
             </AccordionDetails>
           </Accordion>
-          <div style={{ height: 35 }} />
+          <div style={{ height: 55 }} />
           <MotorMonitorGraph motorKey={key} />
         </CardContent>
       </Card>

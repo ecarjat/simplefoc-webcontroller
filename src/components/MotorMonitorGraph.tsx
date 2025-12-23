@@ -380,7 +380,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
   });
 
   return (
-    <Stack direction="row" spacing={2} alignItems="flex-start">
+    <Stack direction="row" spacing={8} alignItems="flex-start">
       <Box sx={{ minWidth: 320, flexShrink: 0 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
           <TextField
@@ -449,7 +449,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
           </Accordion>
         )}
       </Box>
-      <Box sx={{ flex: 1, minHeight: 400 }}>
+      <Box sx={{ flex: 1, minHeight: 400}}>
         <ResizableBox
           width={Infinity}
           height={plotHeight}
@@ -473,7 +473,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
           <div
             ref={plotContainerRef}
             style={{
-              width: "100%",
+              width: "98%",
               height: "100%",
               minHeight: 300,
               overflow: "hidden",

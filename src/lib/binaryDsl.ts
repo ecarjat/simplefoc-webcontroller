@@ -6,6 +6,7 @@ export type BinaryDslAction =
   | { kind: "telemetry"; motor: number; registers: number[]; frequencyHz: number }
   | { kind: "raw"; bytes: Uint8Array }
   | { kind: "calibration" }
+  | { kind: "save" }
   | { kind: "sync" };
 
 const resolveRegister = (token: string) => {
@@ -42,6 +43,9 @@ export const parseBinaryDsl = (input: string): BinaryDslAction | null => {
   }
   if (cmd === "sync") {
     return { kind: "sync" };
+  }
+  if (cmd === "save") {
+    return { kind: "save" };
   }
   if (cmd === "get" || cmd === "read") {
     const regToken = tokens[1];

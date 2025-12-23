@@ -9,6 +9,8 @@ export type PacketType =
   | "telemetry"
   | "telemetryHeader"
   | "log"
+  | "calibrationResponse"
+  | "saveResponse"
   | "sync"
   | "alert"
   | "debug"

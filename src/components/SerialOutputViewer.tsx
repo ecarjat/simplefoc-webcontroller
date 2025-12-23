@@ -57,6 +57,25 @@ const renderEntry = (entry: DisplayEntry, showDecoded: boolean) => {
       </>
     );
   }
+  if (entry.packet.type === "calibrationResponse") {
+    const statusByte = entry.packet.payload[entry.packet.payload.length - 1] ?? 0;
+    const code = entry.packet.payload.length > 1 ? entry.packet.payload[0] : null;
+    if (code === 0x02) {
+      const ok = statusByte === 1;
+      const label = ok ? "Calibration succeeded" : "Calibration failed";
+      return <>🔧 {label}</>;
+    }
+  }
+  if (entry.packet.type === "saveResponse") {
+    const statusByte = entry.packet.payload[entry.packet.payload.length - 1] ?? 0;
+    const code = entry.packet.payload.length > 1 ? entry.packet.payload[0] : null;
+    const ok = statusByte === 1;
+    // Expecting 'w 1 x' where first payload byte is 1
+    if (code === 0x01) {
+      const label = ok ? "Save succeeded" : "Save failed";
+      return <>💾 {label}</>;
+    }
+  }
   if (entry.packet.type === "telemetry") {
     return <>📡 telemetry packet ({entry.packet.payload.length} bytes)</>;
   }

@@ -16,9 +16,13 @@ const TYPE_RESPONSE = "r".charCodeAt(0);
 const TYPE_TELEMETRY_HEADER = "H".charCodeAt(0);
 const TYPE_TELEMETRY = "T".charCodeAt(0);
 const TYPE_SYNC = "S".charCodeAt(0);
+const TYPE_SAVE = "W".charCodeAt(0);
 const TYPE_ALERT = "A".charCodeAt(0);
 const TYPE_DEBUG = "D".charCodeAt(0);
 const TYPE_LOG = "L".charCodeAt(0);
+const TYPE_CALIBRATION = "C".charCodeAt(0);
+const TYPE_CALIBRATION_RESPONSE = "c".charCodeAt(0);
+const TYPE_SAVE_RESPONSE = "w".charCodeAt(0);
 
 const TYPE_MAP: Record<number, BinaryPacket["type"]> = {
   [TYPE_REGISTER]: "register",
@@ -29,6 +33,8 @@ const TYPE_MAP: Record<number, BinaryPacket["type"]> = {
   [TYPE_ALERT]: "alert",
   [TYPE_DEBUG]: "debug",
   [TYPE_LOG]: "log",
+  [TYPE_CALIBRATION_RESPONSE]: "calibrationResponse",
+  [TYPE_SAVE_RESPONSE]: "saveResponse",
 };
 
 type PendingRequest = {
@@ -243,13 +249,15 @@ export class BinarySerialConnection extends EventEmitter<any> implements SerialC
         await this.writeFrame(TYPE_REGISTER, action.bytes);
       }
     } else if (action.kind === "calibration") {
-      // 'C' (0x43) followed by 0x02 as per calibration command
-      await this.writeFrame(TYPE_REGISTER, Uint8Array.from([0x43, 0x02]));
+      await this.writeFrame(TYPE_CALIBRATION, Uint8Array.from([0x02]));
     } else if (action.kind === "read") {
       await this.readRegister(action.registerId);
     } else if (action.kind === "write") {
       await this.writeRegister(action.registerId, action.value);
-    } else if (action.kind === "telemetry") {
+    } else if (action.kind === "save") {
+      await this.writeFrame(TYPE_SAVE, Uint8Array.from([0x01]));
+    } 
+    else if (action.kind === "telemetry") {
       await this.configureTelemetry(
         action.registers.map((reg) => ({ motor: action.motor, register: reg })),
         action.frequencyHz

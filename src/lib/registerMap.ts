@@ -51,7 +51,7 @@ export const REGISTER_DEFINITIONS: RegisterDefinition[] = [
   { id: 0x7f, name: "MOTOR_ADDRESS", encoding: "u8", tooltip: "Selected motor address" },
   { id: 0x10, name: "POSITION", encoding: { kind: "composite", parts: ["u32", "f32"] }, tooltip: "Motor position" },
   { id: 0x12, name: "SENSOR_ANGLE", encoding: "f32", tooltip: "Sensor angle" },
-  { id: 0x11, name: "VELOCITY", encoding: "f32", tooltip: "Motor velocity" },
+  { id: 0x11, name: "VELOCITY", encoding: "f32", tooltip: "Motor velocity (motor.shaft_velocity)" },
 ];
 
 export const REGISTER_BY_ID = Object.fromEntries(
