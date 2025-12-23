@@ -1,3 +1,4 @@
+import "./shims/global";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Buffer } from "buffer";

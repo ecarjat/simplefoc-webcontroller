@@ -11,9 +11,6 @@ export default defineConfig({
       stream: 'stream-browserify'
     }
   },
-  define: {
-    global: 'globalThis'
-  },
   optimizeDeps: {
     include: ['buffer']
   }
