@@ -46,6 +46,9 @@ export const FocScalar = (props: {
   const registerName = COMMAND_TO_REGISTER_NAME[props.command];
   const registerId = registerName ? REGISTER_BY_NAME[registerName].id : null;
   const registerTooltip = registerName ? REGISTER_BY_NAME[registerName]?.tooltip : undefined;
+  const registerEncoding = registerName
+    ? REGISTER_BY_NAME[registerName]?.encoding
+    : undefined;
   const serial = useSerialPort();
   const [boundsOpen, setBoundsOpen] = useState(false);
 
@@ -53,6 +56,13 @@ export const FocScalar = (props: {
   const [value, setValue] = useState<number | null>(null); // value acknowledged by controller, for now not used
   const [displayValue, setDisplayValue] = useState<string>("0");
   const serialRef = useSerialPortRef();
+
+  const formatValue = (val: number) => {
+    if (registerEncoding === "u8" || registerEncoding === "u32") {
+      return Math.round(val).toString();
+    }
+    return val.toFixed(6);
+  };
 
   useSerialLineEvent((line) => {
     if ((serial as any)?.mode === "binary") return;
@@ -81,7 +91,7 @@ export const FocScalar = (props: {
         if (typeof rawVal === "number") {
           setValue(rawVal);
           setTargetValue((prev) => (prev === null ? rawVal : prev));
-          setDisplayValue(rawVal.toFixed(6));
+          setDisplayValue(formatValue(rawVal));
         }
       }
     };
@@ -92,7 +102,7 @@ export const FocScalar = (props: {
         if (typeof rawVal === "number") {
           setValue(rawVal);
           setTargetValue((prev) => (prev === null ? rawVal : prev));
-          setDisplayValue(rawVal.toFixed(6));
+          setDisplayValue(formatValue(rawVal));
         }
       }
     };
@@ -125,7 +135,7 @@ export const FocScalar = (props: {
       return;
     }
     setTargetValue(e.target.value);
-    setDisplayValue(Number(e.target.value).toFixed(6));
+    setDisplayValue(formatValue(Number(e.target.value)));
     changeValue(e.target.value);
   };
 
@@ -137,14 +147,14 @@ export const FocScalar = (props: {
 
   useEffect(() => {
     if (typeof targetValue === "number") {
-      setDisplayValue(targetValue.toFixed(6));
+      setDisplayValue(formatValue(targetValue));
     }
   }, [targetValue]);
 
   const commitDisplayValue = () => {
     if (displayValue === "" || displayValue === "-" || displayValue === "." || displayValue === "-.") {
       setDisplayValue(
-        typeof targetValue === "number" ? targetValue.toFixed(6) : "0"
+        typeof targetValue === "number" ? formatValue(targetValue) : "0"
       );
       return;
     }
@@ -152,7 +162,7 @@ export const FocScalar = (props: {
     if (!isNaN(num)) {
       setTargetValue(num);
       changeValue(num);
-      setDisplayValue(num.toFixed(6));
+      setDisplayValue(formatValue(num));
     }
   };
 
