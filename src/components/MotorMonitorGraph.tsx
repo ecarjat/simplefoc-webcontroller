@@ -359,7 +359,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
         }
         return typeof val === "number" ? val : 0;
       });
-      pipelineRef.current.ingest(mappedValues, performance.now());
+      pipelineRef.current.ingest(mappedValues, Date.now());
     };
     serial.on("telemetry", handler);
     return () => {
@@ -375,7 +375,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
       if (!parts.length) return;
       const enabled = traces.filter((t) => t.enabled);
       const mapped = enabled.map((_, idx) => parts[idx] ?? 0);
-      pipelineRef.current.ingest(mapped, performance.now());
+      pipelineRef.current.ingest(mapped, Date.now());
     }
   });
 

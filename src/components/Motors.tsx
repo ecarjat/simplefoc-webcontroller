@@ -11,13 +11,15 @@ import {
   Tooltip,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import DownloadIcon from "@mui/icons-material/Download";
+import UploadIcon from "@mui/icons-material/Upload";
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
 } from "./ParametersAccordion";
 import { red, green } from "@mui/material/colors";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useSerialIntervalSender } from "../lib/useSerialIntervalSender";
 import { useSerialLineEvent } from "../lib/useSerialLineEvent";
 import { FocBoolean } from "./Parameters/FocBoolean";
@@ -26,7 +28,7 @@ import { MotorMonitorGraph } from "./MotorMonitorGraph";
 import { useSerialPortOpenStatus } from "../lib/serialContext";
 import { MotorControlTypeSwitch } from "./Parameters/MotorControlTypeSwitch";
 import { useSerialPort, useSerialPortRef } from "../lib/serialContext";
-import { REGISTER_BY_NAME } from "../lib/registerMap";
+import { REGISTER_BY_NAME, RegisterName, CONFIG_REGISTER_NAMES } from "../lib/registerMap";
 import Box from "@mui/material/Box";
 
 const MOTOR_OUTPUT_REGEX = /^\?(\w):(.*)\r?$/;
@@ -153,6 +155,173 @@ const ParameterRegisterInput = ({
   );
 };
 
+// Helper function to download motor configuration
+const downloadMotorConfig = async (
+  motorKey: string,
+  serial: any,
+  serialRef: any
+) => {
+  if (!serial || serial.mode !== "binary") return;
+
+  try {
+    await serial.setMotorAddress?.(Number(motorKey));
+
+    const config: Record<string, any> = {};
+
+    // Read all config registers
+    for (const registerName of CONFIG_REGISTER_NAMES) {
+      const registerId = REGISTER_BY_NAME[registerName]?.id;
+      if (registerId === null || registerId === undefined) continue;
+
+      const res = await serial.readRegister?.(registerId);
+      const value = Array.isArray(res?.value) ? res?.value[0] : res?.value;
+
+      if (value !== null && value !== undefined) {
+        config[registerName] = value;
+      }
+    }
+
+    // Format as text file
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\..+/, "")
+      .replace("T", "_");
+
+    const lines = [
+      "# Motor Configuration Export",
+      `# Motor: ${motorKey}`,
+      `# Date: ${new Date().toISOString()}`,
+      "#",
+      "",
+      `MOTOR_KEY=${motorKey}`,
+      "",
+    ];
+
+    // Group parameters by category
+    const categories = {
+      "# Control Parameters": ["MOTION_DOWNSAMPLE"],
+      "# Velocity PID": ["VEL_PID_P", "VEL_PID_I", "VEL_PID_D", "VEL_PID_LIM", "VEL_PID_RAMP", "VEL_LPF_T"],
+      "# Angle PID": ["ANG_PID_P", "ANG_PID_I", "ANG_PID_D", "ANG_PID_LIM", "ANG_PID_RAMP", "ANG_LPF_T"],
+      "# Motor Parameters": [
+        "VOLTAGE_LIMIT",
+        "CURRENT_LIMIT",
+        "VELOCITY_LIMIT",
+        "DRIVER_VOLTAGE_LIMIT",
+        "PWM_FREQUENCY",
+        "DRIVER_VOLTAGE_PSU",
+        "POLE_PAIRS",
+        "PHASE_RESISTANCE",
+        "KV",
+        "INDUCTANCE",
+      ],
+    };
+
+    for (const [categoryName, registers] of Object.entries(categories)) {
+      lines.push(categoryName);
+      for (const reg of registers) {
+        if (config[reg] !== undefined) {
+          lines.push(`${reg}=${config[reg]}`);
+        }
+      }
+      lines.push("");
+    }
+
+    const content = lines.join("\n");
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `motor_${motorKey}_config_${timestamp}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Error downloading config:", error);
+    alert(`Failed to download configuration: ${error}`);
+  }
+};
+
+// Helper function to upload motor configuration
+const uploadMotorConfig = async (
+  motorKey: string,
+  serial: any,
+  serialRef: any
+) => {
+  if (!serial || serial.mode !== "binary") return;
+
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".txt";
+
+  input.onchange = async (e: any) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const lines = text.split("\n");
+
+      await serial.setMotorAddress?.(Number(motorKey));
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const line of lines) {
+        // Skip comments and empty lines
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+
+        // Skip MOTOR_KEY line
+        if (trimmed.startsWith("MOTOR_KEY=")) continue;
+
+        // Parse key=value
+        const match = trimmed.match(/^([A-Z_]+)=(.+)$/);
+        if (!match) continue;
+
+        const [, registerName, valueStr] = match;
+        const registerId = REGISTER_BY_NAME[registerName as RegisterName]?.id;
+
+        if (registerId === null || registerId === undefined) {
+          console.warn(`Unknown register: ${registerName}`);
+          continue;
+        }
+
+        const value = Number(valueStr);
+        if (isNaN(value)) {
+          console.warn(`Invalid value for ${registerName}: ${valueStr}`);
+          errorCount++;
+          continue;
+        }
+
+        try {
+          await serialRef.current?.writeRegister?.(registerId, value, {
+            expectResponse: true,
+          });
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to write ${registerName}:`, err);
+          errorCount++;
+        }
+      }
+
+      if (errorCount > 0) {
+        alert(
+          `Configuration uploaded with warnings.\nSuccessful: ${successCount}\nFailed: ${errorCount}\nCheck console for details.`
+        );
+      } else {
+        alert(`Configuration uploaded successfully! ${successCount} parameters set.`);
+      }
+    } catch (error) {
+      console.error("Error uploading config:", error);
+      alert(`Failed to upload configuration: ${error}`);
+    }
+  };
+
+  input.click();
+};
+
 export const Motors = () => {
   const [motors, setMotors] = useState<{ [key: string]: string }>({});
   const [enabledState, setEnabledState] = useState<Record<string, boolean>>({});
@@ -249,9 +418,38 @@ export const Motors = () => {
         <Card key={key}>
           <CardHeader
             title={
-              <Typography variant="h5">
-                {name === key ? "" : `${name}`}
-              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="h5">
+                  {name === key ? "" : `${name}`}
+                </Typography>
+                {serial?.mode === "binary" && (
+                  <>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => serialRef.current?.send?.("save")}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => downloadMotorConfig(key, serial, serialRef)}
+                    >
+                      Download
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<UploadIcon />}
+                      onClick={() => uploadMotorConfig(key, serial, serialRef)}
+                    >
+                      Upload
+                    </Button>
+                  </>
+                )}
+              </Stack>
             }
             avatar={
               <Avatar
@@ -264,29 +462,18 @@ export const Motors = () => {
               </Avatar>
             }
             action={
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mr: 2 }}>
-                {serial?.mode === "binary" && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => serialRef.current?.send?.("save")}
-                  >
-                    Save
-                  </Button>
-                )}
-                <FocBoolean
-                  command="E"
-                  label="Enabled"
-                  motorKey={key}
-                  offLabel="Off"
-                  onLabel="On"
-                  offValue="0"
-                  onValue="1"
-                  onValueChange={(val) =>
-                    setEnabledState((prev) => ({ ...prev, [key]: val }))
-                  }
-                />
-              </Stack>
+              <FocBoolean
+                command="E"
+                label="Enabled"
+                motorKey={key}
+                offLabel="Off"
+                onLabel="On"
+                offValue="0"
+                onValue="1"
+                onValueChange={(val) =>
+                  setEnabledState((prev) => ({ ...prev, [key]: val }))
+                }
+              />
             }
           />
           <CardContent>

@@ -102,7 +102,11 @@ export class PlotlyRenderer {
     const layout: Partial<Plotly.Layout> = {
       showlegend: false,
       margin: { t: 10, r: 60, b: 40, l: 50 },
-      xaxis: { autorange: true },
+      xaxis: {
+        autorange: true,
+        type: "date",
+        tickformat: "%H:%M:%S.%L",
+      },
     };
     (layout as any).yaxis = {
       title: "Y1",
