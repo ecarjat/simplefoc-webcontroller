@@ -27,7 +27,7 @@ export const SerialCommandPrompt = () => {
   };
 
   const suggestionState = useMemo(() => {
-    const COMMANDS = ["get", "set", "telemetry", "raw", "calibration"];
+    const COMMANDS = ["get", "set", "telemetry", "raw", "sync", "calibration"];
     const FREQ = ["10Hz", "25Hz", "50Hz", "100Hz", "200Hz"];
 
     const hasTrailingSpace = /\s$/.test(promptValue);

@@ -15,6 +15,7 @@ export type PacketType =
   | "calibrationResponse"
   | "saveResponse"
   | "commandResponse"
+  | "sync"
   | "alert"
   | "debug"
   | "unknown";

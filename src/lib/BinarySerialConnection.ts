@@ -15,6 +15,7 @@ const TYPE_REGISTER = "R".charCodeAt(0);
 const TYPE_RESPONSE = "r".charCodeAt(0);
 const TYPE_TELEMETRY_HEADER = "H".charCodeAt(0);
 const TYPE_TELEMETRY = "T".charCodeAt(0);
+const TYPE_SYNC = "S".charCodeAt(0);
 const TYPE_SAVE = "W".charCodeAt(0);
 const TYPE_ALERT = "A".charCodeAt(0);
 const TYPE_DEBUG = "D".charCodeAt(0);
@@ -28,6 +29,7 @@ const TYPE_MAP: Record<number, BinaryPacket["type"]> = {
   [TYPE_RESPONSE]: "response",
   [TYPE_TELEMETRY_HEADER]: "telemetryHeader",
   [TYPE_TELEMETRY]: "telemetry",
+  [TYPE_SYNC]: "sync",
   [TYPE_ALERT]: "alert",
   [TYPE_DEBUG]: "debug",
   [TYPE_LOG]: "log",
@@ -254,7 +256,9 @@ export class BinarySerialConnection extends EventEmitter<any> implements SerialC
       await this.writeRegister(action.registerId, action.value);
     } else if (action.kind === "save") {
       await this.writeFrame(TYPE_SAVE, Uint8Array.from([0x01]));
-    } 
+    } else if (action.kind === "sync") {
+      await this.writeFrame(TYPE_SYNC, Uint8Array.from([0x01]));
+    }
     else if (action.kind === "telemetry") {
       await this.configureTelemetry(
         action.registers.map((reg) => ({ motor: action.motor, register: reg })),

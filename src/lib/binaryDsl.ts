@@ -6,7 +6,8 @@ export type BinaryDslAction =
   | { kind: "telemetry"; motor: number; registers: number[]; frequencyHz: number }
   | { kind: "raw"; bytes: Uint8Array }
   | { kind: "calibration" }
-  | { kind: "save" };
+  | { kind: "save" }
+  | { kind: "sync" };
 
 const resolveRegister = (token: string) => {
   const upper = token.toUpperCase();
@@ -39,6 +40,9 @@ export const parseBinaryDsl = (input: string): BinaryDslAction | null => {
   }
   if (cmd === "raw") {
     return { kind: "raw", bytes: parseHexBytes(tokens.slice(1)) };
+  }
+  if (cmd === "sync") {
+    return { kind: "sync" };
   }
   if (cmd === "save") {
     return { kind: "save" };
