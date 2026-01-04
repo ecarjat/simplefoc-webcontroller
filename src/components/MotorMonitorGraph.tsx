@@ -17,7 +17,7 @@ import {
   REGISTER_DEFINITIONS,
   RegisterDefinition,
 } from "../lib/registerMap";
-import { TelemetryData } from "../lib/serialTypes";
+import { isBinaryMode, TelemetryData } from "../lib/serialTypes";
 import { defaultTelemetryConfig } from "../telemetry/config";
 import { PlotlyRenderer } from "../render/PlotlyRenderer";
 import { TelemetryPipeline } from "../telemetry/TelemetryPipeline";
@@ -149,7 +149,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
 
   // Configure telemetry in binary mode whenever trace selection changes
   useEffect(() => {
-    if (!serial || serial.mode !== "binary") return;
+    if (!serial || !isBinaryMode(serial.mode)) return;
     const enabled = traces.filter((t) => t.enabled);
     const registers = enabled.map((t) => ({ motor: Number(motorKey), register: t.id }));
     serial.configureTelemetry?.(registers, frequencyHz);
@@ -346,7 +346,7 @@ export const MotorMonitorGraph = ({ motorKey }: { motorKey: string }) => {
 
   // Telemetry ingestion for binary mode
   useEffect(() => {
-    if (!serial || serial.mode !== "binary") return;
+    if (!serial || !isBinaryMode(serial.mode)) return;
     const handler = (data: TelemetryData) => {
       if (!pipelineRef.current || frozen) return;
       // map values in order of current enabled traces

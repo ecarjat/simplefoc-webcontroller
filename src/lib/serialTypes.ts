@@ -1,7 +1,10 @@
 import EventEmitter from "eventemitter3";
 import { SerialLine } from "../simpleFoc/serial";
 
-export type SerialMode = "ascii" | "binary";
+export type SerialMode = "ascii" | "binary" | "robustBinary";
+
+export const isBinaryMode = (mode?: SerialMode | null) =>
+  mode === "binary" || mode === "robustBinary";
 
 export type PacketType =
   | "register"
@@ -11,7 +14,7 @@ export type PacketType =
   | "log"
   | "calibrationResponse"
   | "saveResponse"
-  | "sync"
+  | "commandResponse"
   | "alert"
   | "debug"
   | "unknown";

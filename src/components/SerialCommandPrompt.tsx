@@ -2,6 +2,7 @@ import { Autocomplete, Chip, Stack, TextField } from "@mui/material";
 import { Box } from "@mui/system";
 import { KeyboardEventHandler, useMemo, useState } from "react";
 import { useSerialPort } from "../lib/serialContext";
+import { isBinaryMode } from "../lib/serialTypes";
 import { REGISTER_NAME_LIST } from "../lib/registerMap";
 
 export const SerialCommandPrompt = () => {
@@ -26,7 +27,7 @@ export const SerialCommandPrompt = () => {
   };
 
   const suggestionState = useMemo(() => {
-    const COMMANDS = ["get", "set", "telemetry", "raw", "sync", "calibration"];
+    const COMMANDS = ["get", "set", "telemetry", "raw", "calibration"];
     const FREQ = ["10Hz", "25Hz", "50Hz", "100Hz", "200Hz"];
 
     const hasTrailingSpace = /\s$/.test(promptValue);
@@ -137,7 +138,7 @@ export const SerialCommandPrompt = () => {
             />
           </>
         )}
-        {serial?.mode === "binary" && (
+        {isBinaryMode(serial?.mode) && (
           <>
             <Chip
               clickable

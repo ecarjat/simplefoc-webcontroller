@@ -5,6 +5,7 @@ import { useSerialIntervalSender } from "../../lib/useSerialIntervalSender";
 import { useSerialLineEvent } from "../../lib/useSerialLineEvent";
 import { COMMAND_TO_REGISTER_NAME } from "../../lib/commandRegisterMap";
 import { REGISTER_BY_NAME } from "../../lib/registerMap";
+import { isBinaryMode } from "../../lib/serialTypes";
 
 export const FocBoolean = (props: {
   label: string;
@@ -24,7 +25,7 @@ export const FocBoolean = (props: {
   const serialPort = useSerialPort();
   const motorIndex = Number(props.motorKey);
   useSerialLineEvent((line) => {
-    if (serialPort?.mode === "binary") return;
+    if (isBinaryMode(serialPort?.mode)) return;
     if (line.content.startsWith(fullCommandString)) {
       const receivedValue = line.content.slice(fullCommandString.length);
       if (receivedValue !== props.onValue && receivedValue !== props.offValue) {
@@ -40,7 +41,7 @@ export const FocBoolean = (props: {
   });
 
   useEffect(() => {
-    if (!serialPort || serialPort.mode !== "binary" || registerId === null)
+    if (!serialPort || !isBinaryMode(serialPort.mode) || registerId === null)
       return;
     const fetchVal = async () => {
       await serialPort.setMotorAddress?.(motorIndex);
@@ -54,7 +55,7 @@ export const FocBoolean = (props: {
   }, [serialPort, registerId, motorIndex]);
 
   useEffect(() => {
-    if (!serialPort || serialPort.mode !== "binary" || registerId === null)
+    if (!serialPort || !isBinaryMode(serialPort.mode) || registerId === null)
       return;
     const handler = (res: any) => {
       if (res.registerId === registerId && typeof res.value === "number") {
@@ -69,7 +70,7 @@ export const FocBoolean = (props: {
   }, [serialPort, registerId]);
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (serialPort?.mode === "binary" && registerId !== null) {
+    if (isBinaryMode(serialPort?.mode) && registerId !== null) {
       serialPort
         .setMotorAddress?.(motorIndex)
         .then(() =>

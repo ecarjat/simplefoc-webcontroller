@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useSerialPort, useSerialPortOpenStatus } from "./serialContext";
+import { isBinaryMode } from "./serialTypes";
 
 // send the command every X miliseconds and directly after the serial is connected
 export const useSerialIntervalSender = (command: string, interval: number) => {
@@ -10,7 +11,7 @@ export const useSerialIntervalSender = (command: string, interval: number) => {
     if (!status) {
       return;
     }
-    if ((serial as any)?.mode === "binary") {
+    if (isBinaryMode((serial as any)?.mode)) {
       return;
     }
 

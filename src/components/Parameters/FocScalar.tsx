@@ -25,6 +25,7 @@ import { useParameterSettings } from "../../lib/useParameterSettings";
 import { COMMAND_TO_REGISTER_NAME } from "../../lib/commandRegisterMap";
 import { REGISTER_BY_NAME } from "../../lib/registerMap";
 import { useSerialPort } from "../../lib/serialContext";
+import { isBinaryMode } from "../../lib/serialTypes";
 import SettingsIcon from "@mui/icons-material/Settings";
 import Box from "@mui/material/Box";
 import Tooltip from "@mui/material/Tooltip";
@@ -65,7 +66,7 @@ export const FocScalar = (props: {
   };
 
   useSerialLineEvent((line) => {
-    if ((serial as any)?.mode === "binary") return;
+    if (isBinaryMode((serial as any)?.mode)) return;
     if (line.content.startsWith(fullCommandString)) {
       const receivedValue = Number(
         line.content.slice(fullCommandString.length)
@@ -81,7 +82,7 @@ export const FocScalar = (props: {
   useSerialIntervalSender(fullCommandString, 3000);
 
   useEffect(() => {
-    if (!serial || serial.mode !== "binary" || registerId === null) return;
+    if (!serial || !isBinaryMode(serial.mode) || registerId === null) return;
     const motorIndex = Number(props.motorKey);
     const fetchVal = async () => {
       await serial.setMotorAddress?.(motorIndex);
@@ -115,7 +116,7 @@ export const FocScalar = (props: {
   const changeValue = useMemo(
     () =>
       throttle((value: number) => {
-        if ((serialRef.current as any)?.mode === "binary" && registerId !== null) {
+        if (isBinaryMode((serialRef.current as any)?.mode) && registerId !== null) {
           serialRef.current
             ?.setMotorAddress?.(Number(props.motorKey))
             .then(() =>

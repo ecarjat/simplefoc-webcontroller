@@ -16,6 +16,7 @@ import { useState } from "react";
 import { useAvailablePorts } from "../lib/useAvailablePorts";
 import { SimpleFocSerialPort } from "../simpleFoc/serial";
 import { BinarySerialConnection } from "../lib/BinarySerialConnection";
+import { RobustBinarySerialConnection } from "../lib/RobustBinarySerialConnection";
 import { SerialConnection, SerialMode } from "../lib/serialTypes";
 import { SerialCommandPrompt } from "./SerialCommandPrompt";
 import { SerialOutputViewer } from "./SerialOutputViewer";
@@ -56,7 +57,9 @@ export const SerialManager = ({
     const serialImpl =
       mode === "ascii"
         ? new SimpleFocSerialPort(baudRate)
-        : new BinarySerialConnection(baudRate);
+        : mode === "binary"
+        ? new BinarySerialConnection(baudRate)
+        : new RobustBinarySerialConnection(baudRate);
     setLoading(true);
     try {
       await serialImpl.open(port);
@@ -109,6 +112,9 @@ export const SerialManager = ({
             >
               <MenuItem value="ascii">ASCII (Commander)</MenuItem>
               <MenuItem value="binary">BinaryIO (PacketCommander)</MenuItem>
+              <MenuItem value="robustBinary">
+                Robust BinaryIO (PacketCommander)
+              </MenuItem>
             </TextField>
             <ButtonGroup variant="contained">
               <Button

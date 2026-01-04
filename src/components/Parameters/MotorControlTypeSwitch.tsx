@@ -11,6 +11,7 @@ import { useSerialLineEvent } from "../../lib/useSerialLineEvent";
 import { COMMAND_TO_REGISTER_NAME } from "../../lib/commandRegisterMap";
 import { REGISTER_BY_NAME } from "../../lib/registerMap";
 import { useSerialPort } from "../../lib/serialContext";
+import { isBinaryMode } from "../../lib/serialTypes";
 
 const CONTROL_VALUES = ["torque", "vel", "angle", "vel open", "angle open"];
 
@@ -31,7 +32,7 @@ export const MotorControlTypeSwitch = ({ motorKey }: { motorKey: string }) => {
   const registerId = registerName ? REGISTER_BY_NAME[registerName].id : null;
 
   const handleChange = (e: any, val: string) => {
-    if ((serialRef.current as any)?.mode === "binary" && registerId !== null) {
+    if (isBinaryMode((serialRef.current as any)?.mode) && registerId !== null) {
       serialRef.current
         ?.setMotorAddress?.(Number(motorKey))
         .then(() =>
@@ -49,7 +50,7 @@ export const MotorControlTypeSwitch = ({ motorKey }: { motorKey: string }) => {
   };
 
   useSerialLineEvent((line) => {
-    if ((serial as any)?.mode === "binary") return;
+    if (isBinaryMode((serial as any)?.mode)) return;
     if (
       line.content.startsWith(fullCommandString) &&
       // need to filter out the downsample command too which is "{motorKey}CD"
@@ -65,7 +66,7 @@ export const MotorControlTypeSwitch = ({ motorKey }: { motorKey: string }) => {
   useSerialIntervalSender(fullCommandString, 5000);
 
   useEffect(() => {
-    if (!serial || serial.mode !== "binary" || registerId === null) return;
+    if (!serial || !isBinaryMode(serial.mode) || registerId === null) return;
     const motorIndex = Number(motorKey);
     const fetchVal = async () => {
       await serial.setMotorAddress?.(motorIndex);

@@ -57,6 +57,26 @@ const renderEntry = (entry: DisplayEntry, showDecoded: boolean) => {
       </>
     );
   }
+  if (entry.packet.type === "commandResponse") {
+    const cmdId = entry.packet.payload[0];
+    const status = entry.packet.payload[1];
+    const statusLabel =
+      status === 0x00
+        ? "OK"
+        : status === 0x01
+          ? "Error"
+          : status === 0x02
+            ? "Busy"
+            : status === 0xff
+              ? "Unknown"
+              : `Status ${status}`;
+    if (cmdId === 0x02) {
+      return <>🔧 Calibration: {statusLabel}</>;
+    }
+    if (cmdId === 0x01) {
+      return <>💾 Save: {statusLabel}</>;
+    }
+  }
   if (entry.packet.type === "calibrationResponse") {
     const statusByte = entry.packet.payload[entry.packet.payload.length - 1] ?? 0;
     const code = entry.packet.payload.length > 1 ? entry.packet.payload[0] : null;
@@ -70,7 +90,6 @@ const renderEntry = (entry: DisplayEntry, showDecoded: boolean) => {
     const statusByte = entry.packet.payload[entry.packet.payload.length - 1] ?? 0;
     const code = entry.packet.payload.length > 1 ? entry.packet.payload[0] : null;
     const ok = statusByte === 1;
-    // Expecting 'w 1 x' where first payload byte is 1
     if (code === 0x01) {
       const label = ok ? "Save succeeded" : "Save failed";
       return <>💾 {label}</>;

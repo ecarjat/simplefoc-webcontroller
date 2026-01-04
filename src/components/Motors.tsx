@@ -29,6 +29,7 @@ import { useSerialPortOpenStatus } from "../lib/serialContext";
 import { MotorControlTypeSwitch } from "./Parameters/MotorControlTypeSwitch";
 import { useSerialPort, useSerialPortRef } from "../lib/serialContext";
 import { REGISTER_BY_NAME, RegisterName, CONFIG_REGISTER_NAMES } from "../lib/registerMap";
+import { isBinaryMode } from "../lib/serialTypes";
 import Box from "@mui/material/Box";
 
 const MOTOR_OUTPUT_REGEX = /^\?(\w):(.*)\r?$/;
@@ -57,7 +58,7 @@ const ParameterRegisterInput = ({
   };
 
   useEffect(() => {
-    if (!serial || serial.mode !== "binary" || registerId === null) return;
+    if (!serial || !isBinaryMode(serial.mode) || registerId === null) return;
     let cancelled = false;
     let gotResponse = false;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -111,7 +112,7 @@ const ParameterRegisterInput = ({
     const num = Number(display);
     if (isNaN(num)) return;
     setValue(num);
-    if (serialRef.current?.mode === "binary" && registerId !== null) {
+    if (isBinaryMode(serialRef.current?.mode) && registerId !== null) {
       await serialRef.current
         ?.setMotorAddress?.(Number(motorKey))
         .then(() =>
@@ -161,7 +162,7 @@ const downloadMotorConfig = async (
   serial: any,
   serialRef: any
 ) => {
-  if (!serial || serial.mode !== "binary") return;
+  if (!serial || !isBinaryMode(serial.mode)) return;
 
   try {
     await serial.setMotorAddress?.(Number(motorKey));
@@ -249,7 +250,7 @@ const uploadMotorConfig = async (
   serial: any,
   serialRef: any
 ) => {
-  if (!serial || serial.mode !== "binary") return;
+  if (!serial || !isBinaryMode(serial.mode)) return;
 
   const input = document.createElement("input");
   input.type = "file";
@@ -336,7 +337,7 @@ export const Motors = () => {
 
   useSerialIntervalSender("?", 10000);
   useSerialLineEvent((line) => {
-    if (serial?.mode === "binary") return;
+    if (isBinaryMode(serial?.mode)) return;
     const match = line.content.match(MOTOR_OUTPUT_REGEX);
     if (match) {
       setMotors((m) => ({
@@ -353,7 +354,7 @@ export const Motors = () => {
   });
 
   useEffect(() => {
-    if (!serial || serial.mode !== "binary") return;
+    if (!serial || !isBinaryMode(serial.mode)) return;
     let cancelled = false;
     const load = async () => {
     const res = await serial.readRegister?.(REGISTER_BY_NAME.NUM_MOTORS.id);
@@ -422,7 +423,7 @@ export const Motors = () => {
                 <Typography variant="h5">
                   {name === key ? "" : `${name}`}
                 </Typography>
-                {serial?.mode === "binary" && (
+                {isBinaryMode(serial?.mode) && (
                   <>
                     <Button
                       size="small"
